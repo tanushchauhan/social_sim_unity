@@ -11,18 +11,18 @@ namespace SEAN.Util
             // Time.time is in seconds -> *1000 -> milliseconds
             double msecs = startMillis + 1000 * time;
             //uint sec = (uint)(msecs / 1000);
-            //uint nsecs = (uint)((msecs / 1000 - sec) * 1e+9);
-            //print("msecs: " + sec + "." + nsecs);
+            //uint nanosec = (uint)((msecs / 1000 - sec) * 1e+9);
+            //print("msecs: " + sec + "." + nanosec);
             return msecs;
         }
 
-        public static RosMessageTypes.Std.MTime MTime(double milliseconds)
+        public static RosMessageTypes.BuiltinInterfaces.TimeMsg MTime(double milliseconds)
         {
             uint sec = (uint)(milliseconds / 1000);
-            return new RosMessageTypes.Std.MTime
+            return new RosMessageTypes.BuiltinInterfaces.TimeMsg
             {
-                secs = sec,
-                nsecs = (uint)((milliseconds / 1000 - sec) * 1e+9)
+                sec = sec,
+                nanosec = (uint)((milliseconds / 1000 - sec) * 1e+9)
             };
         }
 

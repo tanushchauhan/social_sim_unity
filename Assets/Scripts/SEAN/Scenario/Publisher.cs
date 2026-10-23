@@ -16,20 +16,20 @@ namespace SEAN.Scenario
         ROSConnection ros;
         SEAN sean;
 
-        private RosMessageTypes.SocialSimRos.MSceneInfo message;
+        private RosMessageTypes.SocialSimRos.SceneInfoMsg message;
 
         void Start()
         {
-            ros = ROSConnection.instance;
+            ros = ROSConnection.GetOrCreateInstance();
             sean = SEAN.instance;
-            message = new RosMessageTypes.SocialSimRos.MSceneInfo();
+            message = new RosMessageTypes.SocialSimRos.SceneInfoMsg();
         }
 
         private void Update()
         {
             if (!sean.robotTask.isRunning) { return; }
             sean.clock.UpdateMHeader(message.header);
-            message.header = new RosMessageTypes.Std.MHeader();
+            message.header = new RosMessageTypes.Std.HeaderMsg();
             message.scenario_name = sean.pedestrianBehavior.scenario_name;
             message.robot_start_pose = Util.Geometry.GetMPose(sean.robotTask.robotStart);
             message.robot_target_pose = Util.Geometry.GetMPose(sean.robotTask.robotGoal);

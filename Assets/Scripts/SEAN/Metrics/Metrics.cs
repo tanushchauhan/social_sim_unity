@@ -29,14 +29,14 @@ namespace SEAN.Metrics
 
         private float lastUpdate = 0f;
         private float UpdateSec { get { return 1 / UpdateFrequencyHz; } }
-        public RosMessageTypes.Std.MTime StartTime { get; private set; }
+        public RosMessageTypes.BuiltinInterfaces.TimeMsg StartTime { get; private set; }
         public uint ObjectCollisions { get; private set; }
         public double MinDistToPed { get; private set; }
         public double MinDistToTarget { get; private set; }
 
         public bool HasActors { get { return sean.pedestrianBehavior.agents.Length > 0; } }
         public List<Pose> RobotPoses { get; private set; }
-        public List<RosMessageTypes.Std.MTime> RobotPosesTS { get; private set; }
+        public List<RosMessageTypes.BuiltinInterfaces.TimeMsg> RobotPosesTS { get; private set; }
 
         public uint RobotOnPersonCollisions { get; private set; }
         public uint PersonOnRobotCollisions { get; private set; }
@@ -90,7 +90,7 @@ namespace SEAN.Metrics
             }
             StartTime = sean.clock.Now();
             RobotPoses = new List<Pose>();
-            RobotPosesTS = new List<RosMessageTypes.Std.MTime>();
+            RobotPosesTS = new List<RosMessageTypes.BuiltinInterfaces.TimeMsg>();
             ObjectCollisions = 0;
             MinDistToPed = double.MaxValue;
             MinDistToTarget = double.MaxValue;

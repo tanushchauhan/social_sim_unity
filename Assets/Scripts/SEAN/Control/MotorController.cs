@@ -35,7 +35,7 @@ namespace SEAN.Control
 
         void Start()
         {
-            ROSConnection.instance.Subscribe<RosMessageTypes.Std.MFloat64>(Topic, ReceiveMessage);
+            ROSConnection.GetOrCreateInstance().Subscribe<RosMessageTypes.Std.Float64Msg>(Topic, ReceiveMessage);
             //base.Start();
 
             wheelTransform = transform.Find("base_link");
@@ -61,7 +61,7 @@ namespace SEAN.Control
 
         }
 
-        void ReceiveMessage(RosMessageTypes.Std.MFloat64 message)
+        void ReceiveMessage(RosMessageTypes.Std.Float64Msg message)
         {
             //Debug.Log("AAAAAAAAAAAAA");
             targetVelocity = targetSpeed(message.data);

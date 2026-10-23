@@ -86,7 +86,7 @@ public class DepthImageSynthesis : BaseCameraPublisher
             RenderTexture.active = prevActiveRT;
 
             byte[] pngBytes = texturePixels.EncodeToPNG();
-            RosMessageTypes.Sensor.MCompressedImage imageMessage = new RosMessageTypes.Sensor.MCompressedImage(new RosMessageTypes.Std.MHeader(), "png", pngBytes);
+            RosMessageTypes.Sensor.CompressedImageMsg imageMessage = new RosMessageTypes.Sensor.CompressedImageMsg(new RosMessageTypes.Std.HeaderMsg(), "png", pngBytes);
             PublishWithCameraInfo(imageMessage);
 
             yield return new WaitForSeconds(1.0f / FPS);

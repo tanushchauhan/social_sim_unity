@@ -19,10 +19,10 @@ namespace SEAN.TF
         public float AdjustZRot = 0;
 
         private bool initialized = false;
-        private RosMessageTypes.Std.MTime LastHeader = new RosMessageTypes.Std.MTime();
+        private RosMessageTypes.BuiltinInterfaces.TimeMsg LastHeader = new RosMessageTypes.BuiltinInterfaces.TimeMsg();
         GameObject BaseToFrame;
 
-        RosMessageTypes.Geometry.MPoseStamped baseToFramePoseStamped = new RosMessageTypes.Geometry.MPoseStamped();
+        RosMessageTypes.Geometry.PoseStampedMsg baseToFramePoseStamped = new RosMessageTypes.Geometry.PoseStampedMsg();
 
         private void Start()
         {

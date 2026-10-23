@@ -45,7 +45,7 @@ namespace SEAN.Tasks
         public float debounceTimeoutSec = 5f;
         private float debounceStartupTime = 0f;
         protected float debounceStartupTimeoutSec = 3f;
-        private static RosMessageTypes.Geometry.MPoseStamped nextGoal;
+        private static RosMessageTypes.Geometry.PoseStampedMsg nextGoal;
 
         public Transform robotStartTransform
         {
@@ -177,7 +177,7 @@ namespace SEAN.Tasks
 
         public virtual void Start()
         {
-            ros = ROSConnection.instance;
+            ros = ROSConnection.GetOrCreateInstance();
             sean = SEAN.instance;
             initStartAndGoal();
             number = 0;
@@ -202,7 +202,7 @@ namespace SEAN.Tasks
 
         protected void Publish(GameObject goal)
         {
-            nextGoal = new RosMessageTypes.Geometry.MPoseStamped();
+            nextGoal = new RosMessageTypes.Geometry.PoseStampedMsg();
             nextGoal.header.frame_id = FrameID;
             sean.clock.UpdateMHeader(nextGoal.header);
             nextGoal.pose = Util.Geometry.GetMPose(goal.transform);

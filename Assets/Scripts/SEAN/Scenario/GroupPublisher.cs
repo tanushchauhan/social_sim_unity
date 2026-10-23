@@ -20,17 +20,17 @@ namespace SEAN.Scenario
 
         void Start()
         {
-            ros = ROSConnection.instance;
+            ros = ROSConnection.GetOrCreateInstance();
             sean = SEAN.instance;
         }
 
         private void Update()
         {
-            RosMessageTypes.Geometry.MPoseArray message = new RosMessageTypes.Geometry.MPoseArray();
+            RosMessageTypes.Geometry.PoseArrayMsg message = new RosMessageTypes.Geometry.PoseArrayMsg();
             message.header.frame_id = frame;
             message.header.stamp = sean.clock.LastPublishedTime();
             Trajectory.TrackedGroup[] groups = sean.pedestrianBehavior.groups;
-            message.poses = new RosMessageTypes.Geometry.MPose[groups.Length];
+            message.poses = new RosMessageTypes.Geometry.PoseMsg[groups.Length];
             int i = 0;
             foreach (Trajectory.TrackedGroup group in groups)
             {

@@ -46,12 +46,12 @@ namespace SEAN.Sensors
             raycastHits = new RaycastHit[samples];
         }
 
-        public override RosMessageTypes.Sensor.MLaserScan InitializeMessage(string FrameId)
+        public override RosMessageTypes.Sensor.LaserScanMsg InitializeMessage(string FrameId)
         {
 
-            return new RosMessageTypes.Sensor.MLaserScan
+            return new RosMessageTypes.Sensor.LaserScanMsg
             {
-                header = new RosMessageTypes.Std.MHeader { frame_id = FrameId },
+                header = new RosMessageTypes.Std.HeaderMsg { frame_id = FrameId },
                 angle_min = angle_min,
                 angle_max = angle_max,
                 angle_increment = angle_increment,

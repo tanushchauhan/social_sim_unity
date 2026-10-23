@@ -6,17 +6,17 @@ public class StringPublisher : MonoBehaviour
     public string topicName;
 
     public string publishedString;
-    private RosMessageTypes.Std.MString message;
+    private RosMessageTypes.Std.StringMsg message;
 
     void Start()
     {
-        ros = ROSConnection.instance;
+        ros = ROSConnection.GetOrCreateInstance();
         InitializeMessage();
     }
 
     private void InitializeMessage()
     {
-        message = new RosMessageTypes.Std.MString();
+        message = new RosMessageTypes.Std.StringMsg();
         message.data = "";
     }
 

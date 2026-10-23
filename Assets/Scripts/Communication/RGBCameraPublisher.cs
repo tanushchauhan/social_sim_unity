@@ -64,7 +64,7 @@ public class RGBCameraPublisher : BaseCameraPublisher
             // restore
             RenderTexture.active = prevActiveRT;
 
-            RosMessageTypes.Sensor.MCompressedImage imageMessage = new RosMessageTypes.Sensor.MCompressedImage(new RosMessageTypes.Std.MHeader(), "png", byteArray);
+            RosMessageTypes.Sensor.CompressedImageMsg imageMessage = new RosMessageTypes.Sensor.CompressedImageMsg(new RosMessageTypes.Std.HeaderMsg(), "png", byteArray);
             PublishWithCameraInfo(imageMessage);
 
             yield return new WaitForSeconds(1.0f / FPS);

@@ -35,7 +35,7 @@ namespace SEAN.Scenario.Classifier
             joinGroup = Scenario.Situation.JoinGroup;
 
             lastUpdateTime = 0f;
-            ros = ROSConnection.instance;
+            ros = ROSConnection.GetOrCreateInstance();
             sean = SEAN.instance;
         }
 
@@ -47,7 +47,7 @@ namespace SEAN.Scenario.Classifier
             //if (situation.name == "leave_group") {
             //    print("Publishing: " + situation.name + ": " + situation.val);
             //}
-            RosMessageTypes.Std.MFloat32 msg = new RosMessageTypes.Std.MFloat32();
+            RosMessageTypes.Std.Float32Msg msg = new RosMessageTypes.Std.Float32Msg();
             msg.data = situation.val;
             ros.Send(BaseTopic + ClassifierType + situation.name, msg);
         }

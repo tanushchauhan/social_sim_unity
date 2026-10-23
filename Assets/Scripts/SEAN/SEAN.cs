@@ -171,7 +171,7 @@ namespace SEAN
             ParseCommandLineArgs();
 
 #if !UNITY_EDITOR
-            ROSConnection.instance.RosPort = RosConnectionPort;
+            ROSConnection.GetOrCreateInstance().RosPort = RosConnectionPort;
 #endif
         }
 

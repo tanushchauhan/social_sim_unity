@@ -19,13 +19,13 @@ namespace SEAN
         protected void Start()
         {
             sean = SEAN.instance;
-            ros = ROSConnection.instance;
+            ros = ROSConnection.GetOrCreateInstance();
 
             // Subscribers
-            ros.Subscribe<RosMessageTypes.Std.MBool>(TopicTaskNew, RecvTaskNew);
+            ros.Subscribe<RosMessageTypes.Std.BoolMsg>(TopicTaskNew, RecvTaskNew);
         }
 
-        void RecvTaskNew(RosMessageTypes.Std.MBool msg)
+        void RecvTaskNew(RosMessageTypes.Std.BoolMsg msg)
         {
             if (sean.EvaluationMode) {
                 Debug.LogWarning("New Task disabled in evaluation mode");

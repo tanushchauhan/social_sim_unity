@@ -24,7 +24,7 @@ namespace SEAN.Control
         {
             base.Start();
             rb = sean.robot.base_link.GetComponent<Rigidbody>();
-            // ROSConnection.instance.Subscribe<RosMessageTypes.Geometry.MTwist>(Topic, CmdVelMessage);
+            // ROSConnection.GetOrCreateInstance().Subscribe<RosMessageTypes.Geometry.TwistMsg>(Topic, CmdVelMessage);
         }
 
         private void FixedUpdate()
@@ -67,7 +67,7 @@ namespace SEAN.Control
             //print("velocity: " + rb.velocity);
         }
 
-        override sealed protected void CmdVelMessage(RosMessageTypes.Geometry.MTwist msg)
+        override sealed protected void CmdVelMessage(RosMessageTypes.Geometry.TwistMsg msg)
         {
             // print("in callback message");
             if (msg == null) { return; }

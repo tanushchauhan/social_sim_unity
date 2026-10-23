@@ -14,7 +14,7 @@ namespace SEAN.TF
         public Transform PublishedTransform;
         public string FrameId = "map";
 
-        private RosMessageTypes.Nav.MOdometry message;
+        private RosMessageTypes.Nav.OdometryMsg message;
 
         private float previousRealTime;
         private Vector3 previousPosition = Vector3.zero;
@@ -29,7 +29,7 @@ namespace SEAN.TF
 
         void Start()
         {
-            ros = ROSConnection.instance;
+            ros = ROSConnection.GetOrCreateInstance();
             InitializeMessage();
 
         }
@@ -41,7 +41,7 @@ namespace SEAN.TF
 
         private void InitializeMessage()
         {
-            message = new RosMessageTypes.Nav.MOdometry();
+            message = new RosMessageTypes.Nav.OdometryMsg();
             message.pose.covariance = identityMatrix;
             message.twist.covariance = identityMatrix;
             message.child_frame_id = FrameId;

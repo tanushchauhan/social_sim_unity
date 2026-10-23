@@ -21,13 +21,13 @@ namespace SEAN.Scenario.Agents
 
         void Start()
         {
-            ros = ROSConnection.instance;
+            ros = ROSConnection.GetOrCreateInstance();
             sean = SEAN.instance;
         }
 
         private void Update()
         {
-            RosMessageTypes.Geometry.MPoseArray message = new RosMessageTypes.Geometry.MPoseArray();
+            RosMessageTypes.Geometry.PoseArrayMsg message = new RosMessageTypes.Geometry.PoseArrayMsg();
             message.header.frame_id = frame;
             message.header.stamp = sean.clock.LastPublishedTime();
             // Filter out the robot
@@ -37,7 +37,7 @@ namespace SEAN.Scenario.Agents
                 //if (person is IVI.RobotAgent) { continue; }
                 people.Add(person);
             }
-            message.poses = new RosMessageTypes.Geometry.MPose[people.Count];
+            message.poses = new RosMessageTypes.Geometry.PoseMsg[people.Count];
             int i = 0;
             foreach (Trajectory.TrackedAgent person in people)
             {

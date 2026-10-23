@@ -13,10 +13,10 @@ public class DisplaySocialSituation : MonoBehaviour
 
     void Start()
     {
-        ROSConnection.instance.Subscribe<RosMessageTypes.Std.MString>("lifecycle_learner/social_situation", ReceiveMessage);
+        ROSConnection.GetOrCreateInstance().Subscribe<RosMessageTypes.Std.StringMsg>("lifecycle_learner/social_situation", ReceiveMessage);
     }
 
-    void ReceiveMessage(RosMessageTypes.Std.MString message)
+    void ReceiveMessage(RosMessageTypes.Std.StringMsg message)
     {
         text.text = "Social situation: " + message.data;
     }

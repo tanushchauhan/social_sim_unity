@@ -13,19 +13,19 @@ namespace SEAN.TF
     public class BaseTransformPublisher : MonoBehaviour
     {
         private ROSConnection ros;
-        private RosMessageTypes.Std.MTime LastHeader = new RosMessageTypes.Std.MTime();
+        private RosMessageTypes.BuiltinInterfaces.TimeMsg LastHeader = new RosMessageTypes.BuiltinInterfaces.TimeMsg();
 
         protected void Start()
         {
-            ros = ROSConnection.instance;
+            ros = ROSConnection.GetOrCreateInstance();
         }
 
         public class NamedTransform
         {
             public string name;
-            public RosMessageTypes.Geometry.MPoseStamped pose;
+            public RosMessageTypes.Geometry.PoseStampedMsg pose;
 
-            public NamedTransform(string name, RosMessageTypes.Geometry.MPoseStamped pose)
+            public NamedTransform(string name, RosMessageTypes.Geometry.PoseStampedMsg pose)
             {
                 this.name = name;
                 this.pose = pose;
@@ -44,7 +44,7 @@ namespace SEAN.TF
             foreach (NamedTransform transform in transforms)
             {
                 SEAN.instance.clock.UpdateMHeader(transform.pose.header);
-                if (LastHeader.secs >= transform.pose.header.stamp.secs && LastHeader.nsecs >= transform.pose.header.stamp.nsecs)
+                if (LastHeader.sec >= transform.pose.header.stamp.sec && LastHeader.nanosec >= transform.pose.header.stamp.nanosec)
                 {
                     return;
                 }
@@ -55,8 +55,8 @@ namespace SEAN.TF
                 }
                 ros.Send(name, transform.pose);
             }
-            LastHeader.secs = transforms[0].pose.header.stamp.secs;
-            LastHeader.nsecs = transforms[0].pose.header.stamp.nsecs;
+            LastHeader.sec = transforms[0].pose.header.stamp.sec;
+            LastHeader.nanosec = transforms[0].pose.header.stamp.nanosec;
         }
     }
 }

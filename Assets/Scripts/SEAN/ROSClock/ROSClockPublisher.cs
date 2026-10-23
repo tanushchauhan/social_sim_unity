@@ -24,7 +24,7 @@ namespace SEAN.ROSClock
 
 
         public double LastMSecs { get; private set; }
-        private RosMessageTypes.Std.MTime lastPublishedTime;
+        private RosMessageTypes.BuiltinInterfaces.TimeMsg lastPublishedTime;
 
         private void Awake()
         {
@@ -44,7 +44,7 @@ namespace SEAN.ROSClock
 
         void Start()
         {
-            ros = ROSConnection.instance;
+            ros = ROSConnection.GetOrCreateInstance();
         }
 
         void FixedUpdate()
@@ -52,12 +52,12 @@ namespace SEAN.ROSClock
             instance.Publish();
         }
 
-        public RosMessageTypes.Std.MTime Now()
+        public RosMessageTypes.BuiltinInterfaces.TimeMsg Now()
         {
             return Util.Time.MTime(Util.Time.Milliseconds(StartMillis));
         }
 
-        public RosMessageTypes.Std.MTime LastPublishedTime()
+        public RosMessageTypes.BuiltinInterfaces.TimeMsg LastPublishedTime()
         {
             return lastPublishedTime;
         }
@@ -70,27 +70,27 @@ namespace SEAN.ROSClock
                 return;
             }
             LastMSecs = msecs;
-            RosMessageTypes.Std.MTime t = instance.Now();
-            RosMessageTypes.Rosgraph.MClock message = new RosMessageTypes.Rosgraph.MClock();
-            message.clock.secs = t.secs;
-            message.clock.nsecs = t.nsecs;
-            //print("clock: " + t.secs + "." + t.nsecs);
+            RosMessageTypes.BuiltinInterfaces.TimeMsg t = instance.Now();
+            RosMessageTypes.Rosgraph.ClockMsg message = new RosMessageTypes.Rosgraph.ClockMsg();
+            message.clock.sec = t.sec;
+            message.clock.nanosec = t.nanosec;
+            //print("clock: " + t.sec + "." + t.nanosec);
             ros.Send(topicName, message);
             lastPublishedTime = t;
         }
 
-        public void UpdateMHeader(RosMessageTypes.Std.MHeader header)
+        public void UpdateMHeader(RosMessageTypes.Std.HeaderMsg header)
         {
-            UpdateMHeaders(new List<RosMessageTypes.Std.MHeader>() { header });
+            UpdateMHeaders(new List<RosMessageTypes.Std.HeaderMsg>() { header });
         }
 
-        public void UpdateMHeaders(List<RosMessageTypes.Std.MHeader> headers)
+        public void UpdateMHeaders(List<RosMessageTypes.Std.HeaderMsg> headers)
         {
-            foreach (RosMessageTypes.Std.MHeader header in headers)
+            foreach (RosMessageTypes.Std.HeaderMsg header in headers)
             {
                 header.seq++;
-                header.stamp.secs = lastPublishedTime.secs;
-                header.stamp.nsecs = lastPublishedTime.nsecs;
+                header.stamp.sec = lastPublishedTime.sec;
+                header.stamp.nanosec = lastPublishedTime.nanosec;
             }
         }
     }

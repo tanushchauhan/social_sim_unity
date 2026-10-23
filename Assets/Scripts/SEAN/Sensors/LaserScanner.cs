@@ -12,6 +12,6 @@ namespace SEAN.Sensors
     {
         public abstract float[] Scan();
         public abstract float ScanPeriod();
-        public abstract RosMessageTypes.Sensor.MLaserScan InitializeMessage(string FrameID);
+        public abstract RosMessageTypes.Sensor.LaserScanMsg InitializeMessage(string FrameID);
     }
 }

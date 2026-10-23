@@ -62,11 +62,11 @@ public class AttentionBarGraph : MonoBehaviour
         size = image1.rectTransform.sizeDelta;
         canvasSize = attentionCanvas.GetComponent<RectTransform>().sizeDelta;
 
-        ROSConnection.instance.Subscribe<RosMessageTypes.Std.MFloat32MultiArray>(topic1, ReceiveMessageL);
-        ROSConnection.instance.Subscribe<RosMessageTypes.Std.MFloat32MultiArray>(topic2, ReceiveMessageCmdVel);
+        ROSConnection.GetOrCreateInstance().Subscribe<RosMessageTypes.Std.Float32MultiArrayMsg>(topic1, ReceiveMessageL);
+        ROSConnection.GetOrCreateInstance().Subscribe<RosMessageTypes.Std.Float32MultiArrayMsg>(topic2, ReceiveMessageCmdVel);
     }
 
-    void ReceiveMessageL(RosMessageTypes.Std.MFloat32MultiArray message)
+    void ReceiveMessageL(RosMessageTypes.Std.Float32MultiArrayMsg message)
     {
         //Debug.Log("message received attention_l");
         isUsingAttentionL = true;
@@ -86,7 +86,7 @@ public class AttentionBarGraph : MonoBehaviour
         }
     }
 
-    void ReceiveMessageCmdVel(RosMessageTypes.Std.MFloat32MultiArray message)
+    void ReceiveMessageCmdVel(RosMessageTypes.Std.Float32MultiArrayMsg message)
     {
         // Debug.Log("message received attention_cmd_vel");
         isUsingAttentionCmdVel = true;

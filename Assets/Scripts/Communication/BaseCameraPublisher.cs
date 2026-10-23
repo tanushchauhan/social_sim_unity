@@ -14,7 +14,7 @@ public abstract class BaseCameraPublisher : MonoBehaviour
 
     protected void Start()
     {
-        ros = ROSConnection.instance;
+        ros = ROSConnection.GetOrCreateInstance();
         camera = GetComponent<Camera>();
         if (Topic.EndsWith("/"))
         {
@@ -30,15 +30,15 @@ public abstract class BaseCameraPublisher : MonoBehaviour
         }
     }
 
-    private RosMessageTypes.Sensor.MCameraInfo CameraInfo()
+    private RosMessageTypes.Sensor.CameraInfoMsg CameraInfo()
     {
         uint height = checked((uint)camera.pixelHeight);
         uint width = checked((uint)camera.pixelWidth);
         height = checked((uint)480);
         width = checked((uint)640);
-        RosMessageTypes.Sensor.MCameraInfo message = new RosMessageTypes.Sensor.MCameraInfo
+        RosMessageTypes.Sensor.CameraInfoMsg message = new RosMessageTypes.Sensor.CameraInfoMsg
         {
-            header = new RosMessageTypes.Std.MHeader { frame_id = FrameId },
+            header = new RosMessageTypes.Std.HeaderMsg { frame_id = FrameId },
             height = height,
             width = width,
             distortion_model = "plumb_bob",
@@ -75,10 +75,10 @@ public abstract class BaseCameraPublisher : MonoBehaviour
         return message;
     }
 
-    protected void PublishWithCameraInfo(RosMessageTypes.Sensor.MCompressedImage imageMessage)
+    protected void PublishWithCameraInfo(RosMessageTypes.Sensor.CompressedImageMsg imageMessage)
     {
-        RosMessageTypes.Sensor.MCameraInfo infoMessage = CameraInfo();
-        SEAN.SEAN.instance.clock.UpdateMHeaders(new List<RosMessageTypes.Std.MHeader>() { imageMessage.header, infoMessage.header });
+        RosMessageTypes.Sensor.CameraInfoMsg infoMessage = CameraInfo();
+        SEAN.SEAN.instance.clock.UpdateMHeaders(new List<RosMessageTypes.Std.HeaderMsg>() { imageMessage.header, infoMessage.header });
         imageMessage.header.frame_id = FrameId;
         ros.Send(Topic + "/camera_info", infoMessage);
         ros.Send(Topic + "/compressed", imageMessage);

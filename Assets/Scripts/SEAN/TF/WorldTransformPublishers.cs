@@ -16,8 +16,8 @@ namespace SEAN.TF
         GameObject MapToRobot;
         GameObject MapToOdom;
         private bool initialized = false;
-        RosMessageTypes.Geometry.MPoseStamped mapToRobotPoseStamped = new RosMessageTypes.Geometry.MPoseStamped();
-        RosMessageTypes.Geometry.MPoseStamped mapToOdomPoseStamped = new RosMessageTypes.Geometry.MPoseStamped();
+        RosMessageTypes.Geometry.PoseStampedMsg mapToRobotPoseStamped = new RosMessageTypes.Geometry.PoseStampedMsg();
+        RosMessageTypes.Geometry.PoseStampedMsg mapToOdomPoseStamped = new RosMessageTypes.Geometry.PoseStampedMsg();
 
 
         private void Start()
