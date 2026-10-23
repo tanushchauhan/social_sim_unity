@@ -1,0 +1,19 @@
+{
+    "name": "SEAN.MessageGeneration.Editor",
+    "rootNamespace": "SEAN.Editor",
+    "references": [
+        "Unity.Robotics.ROSTCPConnector",
+        "Unity.Robotics.ROSTCPConnector.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
