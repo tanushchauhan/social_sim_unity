@@ -206,7 +206,7 @@ namespace SEAN.Tasks
             nextGoal.header.frame_id = FrameID;
             sean.clock.UpdateMHeader(nextGoal.header);
             nextGoal.pose = Util.Geometry.GetMPose(goal.transform);
-            ros.Send(Topic, nextGoal);
+            ros.PublishAuto(Topic, nextGoal);
         }
 
         private void initStartAndGoal()

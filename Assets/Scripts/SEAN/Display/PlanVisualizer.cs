@@ -83,7 +83,7 @@ namespace SEAN.Display
             {
                 return;
             }
-            stamp = message.header.stamp.sec;
+            stamp = (ulong)message.header.stamp.sec;
             if (prevStamp == null || stamp - prevStamp < waitSec)
             {
                 return;

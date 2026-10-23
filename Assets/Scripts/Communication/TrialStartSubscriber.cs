@@ -43,7 +43,7 @@ public class TrialStartSubscriber : MonoBehaviour
 
     void ReceiveMessage(RosMessageTypes.SocialSimRos.TrialStartMsg message)
     {
-        stamp = message.header.stamp.sec;
+        stamp = (ulong)message.header.stamp.sec;
         robotPosition = ((Vector3<FLU>)GetPosition(message.spawn)).toUnity;
         robotRotation = ((Quaternion<FLU>)GetRotation(message.spawn)).toUnity;
         targetPosition = ((Vector3<FLU>)GetPosition(message.target)).toUnity;

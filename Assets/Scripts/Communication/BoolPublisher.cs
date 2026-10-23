@@ -29,7 +29,7 @@ public class BoolPublisher : MonoBehaviour
     private void Update()
     {
         if (isInfoUpdated)
-            ros.Send(Topic, message);
+            ros.PublishAuto(Topic, message);
     }
 
     private void InitializeMessage()

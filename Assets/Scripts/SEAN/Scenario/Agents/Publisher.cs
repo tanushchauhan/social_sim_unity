@@ -40,7 +40,7 @@ namespace SEAN.Scenario.Agents
                 agent.twist = Util.Geometry.GetMTwist(person.trajectory);
                 message.agents[i++] = agent;
             }
-            ros.Send(topicName, message);
+            ros.PublishAuto(topicName, message);
         }
     }
 }

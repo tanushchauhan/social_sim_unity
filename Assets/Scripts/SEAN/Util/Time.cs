@@ -18,7 +18,7 @@ namespace SEAN.Util
 
         public static RosMessageTypes.BuiltinInterfaces.TimeMsg MTime(double milliseconds)
         {
-            uint sec = (uint)(milliseconds / 1000);
+            int sec = (int)(milliseconds / 1000);
             return new RosMessageTypes.BuiltinInterfaces.TimeMsg
             {
                 sec = sec,

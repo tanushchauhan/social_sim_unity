@@ -140,8 +140,8 @@ namespace SEAN.Mapping
                 created = true;
                 RotateTextures();
                 UpdateMessages();
-                ros.Send("/short_map/compressed", short_map_msg);
-                ros.Send("/tall_map/compressed", tall_map_msg);
+                ros.PublishAuto("/short_map/compressed", short_map_msg);
+                ros.PublishAuto("/tall_map/compressed", tall_map_msg);
                 Debug.Log("Done!");
             }
 

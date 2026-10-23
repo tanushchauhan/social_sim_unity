@@ -68,7 +68,7 @@ namespace SEAN.TF
             message.twist.twist.angular = Util.Geometry.GetGeometryVector3(-angularVelocity.To<FLU>());
             message.pose.pose.position = Util.Geometry.GetGeometryPoint(PublishedTransform.position.To<FLU>());
             message.pose.pose.orientation = Util.Geometry.GetGeometryQuaternion(PublishedTransform.rotation.To<FLU>());
-            ros.Send(topicName, message);
+            ros.PublishAuto(topicName, message);
             timeElapsed = 0;
         }
     }

@@ -49,7 +49,7 @@ namespace SEAN.Scenario.Classifier
             //}
             RosMessageTypes.Std.Float32Msg msg = new RosMessageTypes.Std.Float32Msg();
             msg.data = situation.val;
-            ros.Send(BaseTopic + ClassifierType + situation.name, msg);
+            ros.PublishAuto(BaseTopic + ClassifierType + situation.name, msg);
         }
     }
 }

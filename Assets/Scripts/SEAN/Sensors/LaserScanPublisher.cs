@@ -52,7 +52,7 @@ namespace SEAN.Sensors
         {
             SEAN.instance.clock.UpdateMHeader(message.header);
             message.ranges = laserScanner.Scan();
-            ros.Send(Topic, message);
+            ros.PublishAuto(Topic, message);
         }
     }
 

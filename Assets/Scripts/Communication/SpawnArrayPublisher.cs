@@ -69,6 +69,6 @@ public class SpawnArrayPublisher : MonoBehaviour
         }
         SEAN.SEAN.instance.clock.UpdateMHeader(message.header);
 
-        ros.Send(topicName, message);
+        ros.PublishAuto(topicName, message);
     }
 }

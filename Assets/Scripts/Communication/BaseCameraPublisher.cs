@@ -80,7 +80,7 @@ public abstract class BaseCameraPublisher : MonoBehaviour
         RosMessageTypes.Sensor.CameraInfoMsg infoMessage = CameraInfo();
         SEAN.SEAN.instance.clock.UpdateMHeaders(new List<RosMessageTypes.Std.HeaderMsg>() { imageMessage.header, infoMessage.header });
         imageMessage.header.frame_id = FrameId;
-        ros.Send(Topic + "/camera_info", infoMessage);
-        ros.Send(Topic + "/compressed", imageMessage);
+        ros.PublishAuto(Topic + "/camera_info", infoMessage);
+        ros.PublishAuto(Topic + "/compressed", imageMessage);
     }
 }

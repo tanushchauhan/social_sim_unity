@@ -75,7 +75,7 @@ namespace SEAN.ROSClock
             message.clock.sec = t.sec;
             message.clock.nanosec = t.nanosec;
             //print("clock: " + t.sec + "." + t.nanosec);
-            ros.Send(topicName, message);
+            ros.PublishAuto(topicName, message);
             lastPublishedTime = t;
         }
 
@@ -88,7 +88,6 @@ namespace SEAN.ROSClock
         {
             foreach (RosMessageTypes.Std.HeaderMsg header in headers)
             {
-                header.seq++;
                 header.stamp.sec = lastPublishedTime.sec;
                 header.stamp.nanosec = lastPublishedTime.nanosec;
             }

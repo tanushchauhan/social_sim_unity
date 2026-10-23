@@ -147,9 +147,9 @@ namespace SEAN.Input
             // trigger
             RosMessageTypes.Std.BoolMsg b = new RosMessageTypes.Std.BoolMsg();
             b.data = L1;
-            ros.Send(TopicTrigger, b);
+            ros.PublishAuto(TopicTrigger, b);
             // cmd vel
-            ros.Send(TopicCmdVel, CmdVel);
+            ros.PublishAuto(TopicCmdVel, CmdVel);
         }
     }
 }

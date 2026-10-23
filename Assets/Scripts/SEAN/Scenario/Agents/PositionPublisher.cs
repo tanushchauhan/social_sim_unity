@@ -43,7 +43,7 @@ namespace SEAN.Scenario.Agents
             {
                 message.poses[i++] = Util.Geometry.GetMPose(person.gameObject.transform);
             }
-            ros.Send(topicName, message);
+            ros.PublishAuto(topicName, message);
         }
     }
 }

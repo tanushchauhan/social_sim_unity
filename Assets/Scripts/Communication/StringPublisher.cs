@@ -23,7 +23,7 @@ public class StringPublisher : MonoBehaviour
     private void UpdateMessage()
     {
         message.data = publishedString;
-        ros.Send(topicName, message);
+        ros.PublishAuto(topicName, message);
     }
 
     public void Send(string message)

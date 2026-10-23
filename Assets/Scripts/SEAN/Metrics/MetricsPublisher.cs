@@ -67,7 +67,7 @@ namespace SEAN.Metrics
             // Collisions w/ static objects
             trialInfoMessage.obj_collisions = sean.metrics.ObjectCollisions;
 
-            ros.Send(TopicName, trialInfoMessage);
+            ros.PublishAuto(TopicName, trialInfoMessage);
         }
 
 
