@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2021, Members of Yale Interactive Machines Group, Yale University,
+// Copyright (c) 2021, Members of Yale Interactive Machines Group, Yale University,
 // Mohamed Hussein
 // Nathan Tsoi
 // All rights reserved.
@@ -16,6 +16,8 @@ namespace SEAN.Scenario
         ROSConnection ros;
         SEAN sean;
 
+        public float PublishInterval = 1f;
+        private float lastPublishTime = float.NegativeInfinity;
         private RosMessageTypes.SocialSimRos.SceneInfoMsg message;
 
         void Start()
@@ -27,9 +29,10 @@ namespace SEAN.Scenario
 
         private void Update()
         {
-            if (!sean.robotTask.isRunning) { return; }
+            if (!sean.robotTask.isRunning || Time.time - lastPublishTime < PublishInterval) { return; }
+            lastPublishTime = Time.time;
             sean.clock.UpdateMHeader(message.header);
-            message.header = new RosMessageTypes.Std.HeaderMsg();
+            message.header.frame_id = "map";
             message.scenario_name = sean.pedestrianBehavior.scenario_name;
             message.robot_start_pose = Util.Geometry.GetMPose(sean.robotTask.robotStart);
             message.robot_target_pose = Util.Geometry.GetMPose(sean.robotTask.robotGoal);

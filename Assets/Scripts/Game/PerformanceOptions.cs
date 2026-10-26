@@ -1,24 +1,22 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class PerformanceOptions : MonoBehaviour
 {
-    // Start is called before the first frame update
-    void Start()
+    public int TargetFrameRate = 60;
+
+    private void Awake()
     {
 #if !UNITY_EDITOR
-        bool enableLogs = true;
-        string[] args = System.Environment.GetCommandLineArgs ();
-        for (int i = 0; i < args.Length; i++)
+        string[] args = System.Environment.GetCommandLineArgs();
+        for (int i = 0; i < args.Length - 1; i++)
         {
-            if (args [i] == "-enablelogs")
-            {
-                enableLogs = args [i + 1] == "1";
-                Debug.Log("enableLogs: " + enableLogs);
-            }
+            if (args[i] == "-enablelogs")
+                Debug.unityLogger.logEnabled = args[++i] == "1";
+            else if (args[i] == "-frame-rate")
+                TargetFrameRate = int.Parse(args[++i]);
         }
-        Debug.unityLogger.logEnabled = enableLogs;
+        QualitySettings.vSyncCount = 0;
+        Application.targetFrameRate = Mathf.Max(1, TargetFrameRate);
 #endif
     }
 }

@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2021, Members of Yale Interactive Machines Group, Yale University,
+// Copyright (c) 2021, Members of Yale Interactive Machines Group, Yale University,
 // Nathan Tsoi
 // All rights reserved.
 // This source code is licensed under the BSD-style license found in the
@@ -16,6 +16,8 @@ namespace SEAN.Metrics
 
         public string TopicName = "/social_sim/metrics";
 
+        public float PublishInterval = 1f;
+        private float lastPublishTime = float.NegativeInfinity;
         private RosMessageTypes.SocialSimRos.TrialInfoMsg trialInfoMessage;
 
 
@@ -28,7 +30,8 @@ namespace SEAN.Metrics
 
         private void Update()
         {
-            if (!sean.robotTask.isRunning) { return; }
+            if (!sean.robotTask.isRunning || Time.time - lastPublishTime < PublishInterval) { return; }
+            lastPublishTime = Time.time;
             sean.clock.UpdateMHeader(trialInfoMessage.header);
 
             // Information about the current interaction
