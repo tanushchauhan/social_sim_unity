@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2021, Members of Yale Interactive Machines Group, Yale University,
+// Copyright (c) 2021, Members of Yale Interactive Machines Group, Yale University,
 // Nathan Tsoi
 // All rights reserved.
 // This source code is licensed under the BSD-style license found in the
@@ -21,6 +21,13 @@ namespace SEAN.ROSClock
 
         public static DateTime UNIX_EPOCH = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
         public double StartMillis { get; private set; }
+        private static double? epochMillis;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetEpoch()
+        {
+            epochMillis = null;
+        }
 
 
         public double LastMSecs { get; private set; }
@@ -34,10 +41,10 @@ namespace SEAN.ROSClock
             }
             else
             {
-                //print("TIMESCALE: " + Time.timeScale);
                 _instance = this;
-                StartMillis = (DateTime.Now.ToUniversalTime() - UNIX_EPOCH).TotalMilliseconds;
-                //print("startMillis: " + startMillis);
+                if (!epochMillis.HasValue)
+                    epochMillis = (DateTime.UtcNow - UNIX_EPOCH).TotalMilliseconds - Time.timeAsDouble * 1000;
+                StartMillis = epochMillis.Value;
                 lastPublishedTime = this.Now();
             }
         }

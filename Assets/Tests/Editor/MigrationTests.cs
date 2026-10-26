@@ -75,6 +75,40 @@ public class MigrationTests
     }
 
     [Test]
+    public void ClockEpochSurvivesPublisherReplacement()
+    {
+        Type clockType = FindType("SEAN.ROSClock.ROSClockPublisher");
+        MethodInfo reset = clockType.GetMethod("ResetEpoch", BindingFlags.NonPublic | BindingFlags.Static);
+        MethodInfo awake = clockType.GetMethod("Awake", BindingFlags.NonPublic | BindingFlags.Instance);
+        reset.Invoke(null, null);
+        double? epoch = null;
+        try
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                var gameObject = new GameObject("clock");
+                try
+                {
+                    Component clock = gameObject.AddComponent(clockType);
+                    awake.Invoke(clock, null);
+                    double value = (double)clockType.GetProperty("StartMillis").GetValue(clock);
+                    if (epoch.HasValue) { Assert.That(value, Is.EqualTo(epoch.Value)); }
+                    epoch = value;
+                }
+                finally
+                {
+                    UnityEngine.Object.DestroyImmediate(gameObject);
+                }
+                System.Threading.Thread.Sleep(20);
+            }
+        }
+        finally
+        {
+            reset.Invoke(null, null);
+        }
+    }
+
+    [Test]
     public void CameraCopySkipsReadOnlyFields()
     {
         var source = new GameObject("source");
