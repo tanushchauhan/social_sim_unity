@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2021, Members of Yale Interactive Machines Group, Yale University,
+// Copyright (c) 2021, Members of Yale Interactive Machines Group, Yale University,
 // Nathan Tsoi
 // All rights reserved.
 // This source code is licensed under the BSD-style license found in the
@@ -18,35 +18,36 @@ namespace SEAN.TF
         public float AdjustYRot = 0;
         public float AdjustZRot = 0;
 
-        private bool initialized = false;
-        private RosMessageTypes.BuiltinInterfaces.TimeMsg LastHeader = new RosMessageTypes.BuiltinInterfaces.TimeMsg();
-        GameObject BaseToFrame;
-
         RosMessageTypes.Geometry.PoseStampedMsg baseToFramePoseStamped = new RosMessageTypes.Geometry.PoseStampedMsg();
 
         private void Start()
         {
             sean = SEAN.instance;
             base.Start();
-            BaseToFrame = new GameObject();
-            BaseToFrame.name = "base_link_to_" + FrameID;
             baseToFramePoseStamped.header.frame_id = FrameID;
+        }
+
+        private static Pose RelativePose(Transform parent, Transform child)
+        {
+            Quaternion inverse = Quaternion.Inverse(parent.rotation);
+            return new Pose(inverse * (child.position - parent.position), inverse * child.rotation);
         }
 
         private void Update()
         {
-            BaseToFrame.transform.position = transform.position - sean.robot.position;
-            BaseToFrame.transform.rotation = transform.rotation * Quaternion.Inverse(sean.robot.rotation);
+            Pose pose = RelativePose(sean.robot.transform, transform);
+            Vector3 position = pose.position;
+            Quaternion rotation = pose.rotation;
             if (AdjustXRot != 0 || AdjustYRot != 0 || AdjustZRot != 0) {
-                Vector3 angles = BaseToFrame.transform.rotation.eulerAngles;
+                Vector3 angles = rotation.eulerAngles;
                 angles[0] += AdjustXRot;
                 angles[1] += AdjustYRot;
                 angles[2] += AdjustZRot;
-                BaseToFrame.transform.rotation = Quaternion.Euler(angles);
+                rotation = Quaternion.Euler(angles);
             }
-            baseToFramePoseStamped.pose.position = Util.Geometry.GetGeometryPoint(BaseToFrame.transform.position.To<FLU>());
-            baseToFramePoseStamped.pose.orientation = Util.Geometry.GetGeometryQuaternion(BaseToFrame.transform.rotation.To<FLU>());
-            PublishIfNew(new NamedTransform(BaseToFrame.name, baseToFramePoseStamped));
+            baseToFramePoseStamped.pose.position = Util.Geometry.GetGeometryPoint(position.To<FLU>());
+            baseToFramePoseStamped.pose.orientation = Util.Geometry.GetGeometryQuaternion(rotation.To<FLU>());
+            PublishIfNew(new NamedTransform("base_link_to_" + FrameID, baseToFramePoseStamped));
         }
     }
 }

@@ -1,4 +1,26 @@
-# Social Environment Autonomous Navigation 2.0
+# SEAN 3 Unity migration
+
+This development branch targets Unity 2022.3.62f3 and ROS-TCP-Connector v0.7.0.
+The ROS 2 migration is in progress. A complete Unity-to-Nav2 navigation run has
+not yet been validated in this checkout. ORCA remains unimplemented.
+
+## Migration checks
+
+Open the project with the pinned editor, let package import finish, and run
+`SEAN.Editor.Tests` in Window > General > Test Runner > EditMode. These checks
+cover body-frame velocity, angular wraparound, sensor mounts under rotation,
+and publisher registration after replacing a connection. They require Unity;
+they do not establish end-to-end navigation or sensor fidelity.
+
+Odometry reports ground-truth pose in `map` and body-frame twist in `base_link`,
+with angular velocity in radians per second. The Jackal and Kuri prefabs request
+a 0.05-second publication interval. Task changes clear velocity history; callers
+that teleport the robot outside the task system must call `ResetOdometry()`.
+
+Before collecting results, also verify a live navigation goal, participant
+control, recording, repeated task resets, and scene reloads. Use the matching
+scene and ROS map. The default ROS `lab` map does not match the enabled scenes
+in the current player build settings.
 
 Documentation: [sean.interactive-machines.com](https://sean.interactive-machines.com)
 

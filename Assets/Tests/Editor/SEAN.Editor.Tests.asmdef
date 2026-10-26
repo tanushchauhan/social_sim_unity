@@ -1,0 +1,5 @@
+{
+  "name": "SEAN.Editor.Tests",
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}
