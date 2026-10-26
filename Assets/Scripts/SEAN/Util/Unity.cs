@@ -18,6 +18,7 @@ namespace SEAN.Util
             System.Reflection.FieldInfo[] fields = type.GetFields();
             foreach (System.Reflection.FieldInfo field in fields)
             {
+                if (field.IsLiteral || field.IsInitOnly) { continue; }
                 field.SetValue(copy, field.GetValue(original));
             }
             if (typeof(T) == typeof(Camera))

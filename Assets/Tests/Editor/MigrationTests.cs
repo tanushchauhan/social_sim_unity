@@ -75,6 +75,27 @@ public class MigrationTests
     }
 
     [Test]
+    public void CameraCopySkipsReadOnlyFields()
+    {
+        var source = new GameObject("source");
+        var destination = new GameObject("destination");
+        try
+        {
+            Camera camera = source.AddComponent<Camera>();
+            camera.fieldOfView = 47f;
+            MethodInfo copy = FindType("SEAN.Util.Unity").GetMethod("CopyComponent")
+                .MakeGenericMethod(typeof(Camera));
+            Camera result = (Camera)copy.Invoke(null, new object[] { camera, destination });
+            Assert.That(result.fieldOfView, Is.EqualTo(camera.fieldOfView));
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(source);
+            UnityEngine.Object.DestroyImmediate(destination);
+        }
+    }
+
+    [Test]
     public void PublisherRegistersAgainAfterConnectionReplacement()
     {
         Type connectionType = FindType("Unity.Robotics.ROSTCPConnector.ROSConnection");
