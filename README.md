@@ -1,8 +1,10 @@
 # SEAN 3 Unity migration
 
 This development branch targets Unity 2022.3.62f3 and ROS-TCP-Connector v0.7.0.
-The ROS 2 migration is in progress. A complete Unity-to-Nav2 navigation run has
-not yet been validated in this checkout. ORCA remains unimplemented.
+The ROS 2 migration is in progress. The Warehouse scene passes short Nav2
+navigation checks at startup, after task reset, and after scene reload. This
+headless smoke test uses no pedestrians; camera rendering and interactive study
+workflows still need validation. ORCA remains unimplemented.
 
 ## Migration checks
 
@@ -17,8 +19,18 @@ with angular velocity in radians per second. The Jackal and Kuri prefabs request
 a 0.05-second publication interval. Task changes clear velocity history; callers
 that teleport the robot outside the task system must call `ResetOdometry()`.
 
-Before collecting results, also verify a live navigation goal, participant
-control, recording, repeated task resets, and scene reloads. Use the matching
+For the navigation smoke test, use `-scene SEAN/Warehouse -scenario None
+-task RandomABNav -seed 7 -external-goals`. The external-goal flag suppresses
+task-generated goals while allowing a ROS action client to drive navigation.
+The task timeout should exceed the test duration. `-frame-rate` defaults to 60.
+
+Publish `true` to `/social_sim/control/task/new` to reset a task, or to
+`/social_sim/control/scene/reload` to reload the active scene. Both controls are
+disabled in evaluation mode. Velocity commands are cleared on task reset, and
+the simulation clock keeps its epoch across scene reloads.
+
+Before collecting study results, also verify participant control, recording,
+collision measurements, and the required camera rendering. Use the matching
 scene and ROS map. The default ROS `lab` map does not match the enabled scenes
 in the current player build settings.
 

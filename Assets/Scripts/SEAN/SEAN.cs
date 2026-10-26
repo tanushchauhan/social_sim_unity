@@ -50,16 +50,28 @@ namespace SEAN
         private void ParseCommandLineArgs()
         {
             string[] args = System.Environment.GetCommandLineArgs();
-            for (int i = 0; i < args.Length - 1; i++)
+            bool externalGoals = false;
+            for (int i = 0; i < args.Length; i++)
             {
+                if (args[i] == "-external-goals")
+                {
+                    externalGoals = true;
+                    continue;
+                }
+                if (args[i] == "-evaluation-mode")
+                {
+                    EvaluationMode = true;
+                    continue;
+                }
+                if (i + 1 >= args.Length) { continue; }
                 string value = args[i + 1];
                 if (args[i] == "-ros-tcp-port")
                 {
                     RosConnectionPort = Int32.Parse(value);
                 }
-                else if (args[i] == "-evaluation-mode")
+                else if (args[i] == "-seed")
                 {
-                    EvaluationMode = true;
+                    UnityEngine.Random.InitState(Int32.Parse(value));
                 }
                 else if (args[i] == "-scenario")
                 {
@@ -95,7 +107,7 @@ namespace SEAN
                     robotTask.timeoutTaskSeconds = float.Parse(value);
                 }
             }
-
+            if (externalGoals) { robotTask.PublishGoal = false; }
         }
         #endregion arguments
 
