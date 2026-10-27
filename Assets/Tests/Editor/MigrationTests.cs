@@ -7,6 +7,28 @@ using UnityEngine;
 public class MigrationTests
 {
     [Test]
+    public void RocketboxImporterSkipsModelsWithoutItsSkeleton()
+    {
+        var model = new GameObject("unrelated model");
+        var child = new GameObject("unrelated child");
+        child.transform.SetParent(model.transform, false);
+        try
+        {
+            Type importerType = FindType("FixRocketboxMaxImport");
+            object importer = Activator.CreateInstance(importerType);
+            MethodInfo postprocess = importerType.GetMethod("OnPostprocessModel",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.DoesNotThrow(() => postprocess.Invoke(importer, new object[] { model }));
+            Assert.That(child.transform.parent, Is.EqualTo(model.transform));
+            Assert.That(child.activeSelf, Is.True);
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(model);
+        }
+    }
+
+    [Test]
     public void DestroyedConnectionCancelsWorkerAndRemovesOnlyItsHeader()
     {
         Type connectionType = FindType("Unity.Robotics.ROSTCPConnector.ROSConnection");
