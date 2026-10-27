@@ -6,6 +6,12 @@ navigation checks at startup, after task reset, and after scene reload. This
 headless smoke test uses no pedestrians; camera rendering and interactive study
 workflows still need validation. ORCA remains unimplemented.
 
+The connector is embedded under `Packages/com.unity.robotics.ros-tcp-connector`.
+Its [patch record](Packages/com.unity.robotics.ros-tcp-connector/SEAN-PATCHES.md)
+identifies the upstream revision and scene-lifecycle fixes. Scene destruction
+now cancels the old connection worker and removes its HUD header. Use the
+matching ROS integration's `sean_tcp_endpoint` for subscriber removal support.
+
 ## Migration checks
 
 Open the project with the pinned editor, let package import finish, and run

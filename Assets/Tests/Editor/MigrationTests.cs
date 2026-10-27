@@ -6,6 +6,72 @@ using UnityEngine;
 
 public class MigrationTests
 {
+    [Test]
+    public void DestroyedConnectionCancelsWorkerAndRemovesOnlyItsHeader()
+    {
+        Type connectionType = FindType("Unity.Robotics.ROSTCPConnector.ROSConnection");
+        Type hudType = FindType("Unity.Robotics.ROSTCPConnector.HudPanel");
+        var headers = (System.Collections.IDictionary)hudType
+            .GetField("s_HeaderContents", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
+        var gameObject = new GameObject("connection cleanup");
+        var cancellation = new System.Threading.CancellationTokenSource();
+        Action otherHeader = () => { };
+        try
+        {
+            Component connection = gameObject.AddComponent(connectionType);
+            connectionType.GetField("m_ConnectionThreadCancellation", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(connection, cancellation);
+            Action header = (Action)Delegate.CreateDelegate(typeof(Action), connection,
+                connectionType.GetMethod("DrawHeaderGUI", BindingFlags.NonPublic | BindingFlags.Instance));
+            hudType.GetMethod("RegisterHeader").Invoke(null, new object[] { otherHeader, 900 });
+            hudType.GetMethod("RegisterHeader").Invoke(null, new object[] { header, 901 });
+            connectionType.GetMethod("Connect", Type.EmptyTypes).Invoke(connection, null);
+            Assert.That(connectionType.GetField("m_ConnectionThreadCancellation", BindingFlags.NonPublic | BindingFlags.Instance)
+                .GetValue(connection), Is.SameAs(cancellation), "Duplicate Connect replaced the worker");
+            // EditMode does not dispatch destruction callbacks for an unplayed behaviour.
+            connectionType.GetMethod("OnDestroy", BindingFlags.NonPublic | BindingFlags.Instance)
+                .Invoke(connection, null);
+            UnityEngine.Object.DestroyImmediate(gameObject);
+            Assert.That(cancellation.IsCancellationRequested, Is.True);
+            Assert.That(headers.Contains(901), Is.False);
+            Assert.That(headers.Contains(900), Is.True);
+        }
+        finally
+        {
+            if (gameObject != null) { UnityEngine.Object.DestroyImmediate(gameObject); }
+            headers.Remove(900);
+            headers.Remove(901);
+            cancellation.Dispose();
+        }
+    }
+
+    [Test]
+    public void StopClearsVelocityTargetsAndBodyImmediately()
+    {
+        Type controllerType = FindType("SEAN.Control.VelocityController");
+        var gameObject = new GameObject("reset command");
+        try
+        {
+            Component controller = gameObject.AddComponent(controllerType);
+            Rigidbody body = gameObject.AddComponent<Rigidbody>();
+            var flags = BindingFlags.NonPublic | BindingFlags.Instance;
+            controllerType.GetField("rb", flags).SetValue(controller, body);
+            controllerType.GetField("targetLinVelocity", flags).SetValue(controller, 0.3f);
+            controllerType.GetField("targetAngVelocity", flags).SetValue(controller, 0.5f);
+            body.velocity = Vector3.forward;
+            body.angularVelocity = Vector3.up;
+            controllerType.GetMethod("Stop", flags).Invoke(controller, null);
+            Assert.That(controllerType.GetField("targetLinVelocity", flags).GetValue(controller), Is.EqualTo(0f));
+            Assert.That(controllerType.GetField("targetAngVelocity", flags).GetValue(controller), Is.EqualTo(0f));
+            Assert.That(body.velocity, Is.EqualTo(Vector3.zero));
+            Assert.That(body.angularVelocity, Is.EqualTo(Vector3.zero));
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(gameObject);
+        }
+    }
+
     private static Type FindType(string name)
     {
         return AppDomain.CurrentDomain.GetAssemblies()
