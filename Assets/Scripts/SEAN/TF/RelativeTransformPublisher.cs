@@ -39,11 +39,7 @@ namespace SEAN.TF
             Vector3 position = pose.position;
             Quaternion rotation = pose.rotation;
             if (AdjustXRot != 0 || AdjustYRot != 0 || AdjustZRot != 0) {
-                Vector3 angles = rotation.eulerAngles;
-                angles[0] += AdjustXRot;
-                angles[1] += AdjustYRot;
-                angles[2] += AdjustZRot;
-                rotation = Quaternion.Euler(angles);
+                rotation *= Quaternion.Euler(AdjustXRot, AdjustYRot, AdjustZRot);
             }
             baseToFramePoseStamped.pose.position = Util.Geometry.GetGeometryPoint(position.To<FLU>());
             baseToFramePoseStamped.pose.orientation = Util.Geometry.GetGeometryQuaternion(rotation.To<FLU>());

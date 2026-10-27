@@ -30,12 +30,13 @@ public abstract class BaseCameraPublisher : MonoBehaviour
         }
     }
 
+    protected virtual Camera CalibrationCamera => camera;
+
     private RosMessageTypes.Sensor.CameraInfoMsg CameraInfo()
     {
-        uint height = checked((uint)camera.pixelHeight);
-        uint width = checked((uint)camera.pixelWidth);
-        height = checked((uint)480);
-        width = checked((uint)640);
+        Camera rendered = CalibrationCamera;
+        uint height = checked((uint)rendered.pixelHeight);
+        uint width = checked((uint)rendered.pixelWidth);
         RosMessageTypes.Sensor.CameraInfoMsg message = new RosMessageTypes.Sensor.CameraInfoMsg
         {
             header = new RosMessageTypes.Std.HeaderMsg { frame_id = FrameId },
@@ -52,10 +53,18 @@ public abstract class BaseCameraPublisher : MonoBehaviour
         message.R[0] = 1;
         message.R[4] = 1;
         message.R[8] = 1;
-        var fx = camera.focalLength * 20;
-        var fy = camera.focalLength * 20;
-        var cx = width / 2;
-        var cy = height / 2;
+        // CameraInfo models a pinhole camera. The overview is orthographic;
+        // mark it uncalibrated instead of publishing misleading pinhole intrinsics.
+        if (rendered.orthographic)
+        {
+            message.distortion_model = "";
+            return message;
+        }
+        Matrix4x4 projection = rendered.projectionMatrix;
+        var fx = projection.m00 * width / 2.0;
+        var fy = projection.m11 * height / 2.0;
+        var cx = (1.0 - projection.m02) * width / 2.0;
+        var cy = (1.0 + projection.m12) * height / 2.0;
         var Tx = 0;
         var Ty = 0;
         // assign fx, cx, Tx, fy, cy, Ty to K and P (no ' values as there is no distortion)

@@ -197,6 +197,59 @@ public class MigrationTests
     }
 
     [Test]
+    public void LaserPrefabPublishesItsMessageFrame()
+    {
+        GameObject prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(
+            "Assets/Resources/SEAN/Sensors/RaycastLaserScanner.prefab");
+        Component publisher = prefab.GetComponent(FindType("SEAN.Sensors.LaserScanPublisher"));
+        Component transform = prefab.GetComponent(FindType("SEAN.TF.RelativeTransformPublisher"));
+        Assert.That(transform, Is.Not.Null, "Scan frame must be present without Nav2 or a robot-description publisher");
+        Assert.That(transform.GetType().GetField("FrameID").GetValue(transform),
+            Is.EqualTo(publisher.GetType().GetField("FrameId").GetValue(publisher)));
+    }
+
+    [TestCase(640, 480, 60f, false)]
+    [TestCase(800, 400, 45f, false)]
+    [TestCase(640, 480, 60f, true)]
+    public void CameraCalibrationUsesRenderedProjection(int width, int height, float fov, bool orthographic)
+    {
+        var go = new GameObject("calibration");
+        var output = new RenderTexture(width, height, 24);
+        try
+        {
+            Camera cam = go.AddComponent<Camera>();
+            cam.targetTexture = output;
+            cam.aspect = (float)width / height;
+            cam.fieldOfView = fov;
+            cam.orthographic = orthographic;
+            Type rgbType = FindType("RGBCameraPublisher");
+            Component publisher = go.AddComponent(rgbType);
+            rgbType.GetField("offscreenCamera", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(publisher, cam);
+            object info = FindType("BaseCameraPublisher").GetMethod("CameraInfo", BindingFlags.NonPublic | BindingFlags.Instance)
+                .Invoke(publisher, null);
+            Type infoType = info.GetType();
+            Assert.That(infoType.GetField("width").GetValue(info), Is.EqualTo((uint)width));
+            Assert.That(infoType.GetField("height").GetValue(info), Is.EqualTo((uint)height));
+            double[] k = (double[])infoType.GetProperty("K").GetValue(info);
+            if (orthographic)
+            {
+                Assert.That(k.All(value => value == 0), Is.True);
+                return;
+            }
+            double focal = height / (2.0 * Math.Tan(fov * Math.PI / 360.0));
+            Assert.That(k[0], Is.EqualTo(focal).Within(0.001));
+            Assert.That(k[4], Is.EqualTo(focal).Within(0.001));
+            Assert.That(k[2], Is.EqualTo(width / 2.0));
+            Assert.That(k[5], Is.EqualTo(height / 2.0));
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(go);
+            UnityEngine.Object.DestroyImmediate(output);
+        }
+    }
+
+    [Test]
     public void CameraCopySkipsReadOnlyFields()
     {
         var source = new GameObject("source");
