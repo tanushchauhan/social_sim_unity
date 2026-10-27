@@ -71,6 +71,22 @@ public class PlacementTests
         Assert.That((bool)free.Invoke(map, new object[] { -.01f, 5f }), Is.False);
         Assert.That((bool)free.Invoke(map, new object[] { 19.9f, 5f }), Is.False);
     }
+    [Test] public void NoGoalIsPublishedBeforeTheFirstTaskExists()
+    {
+        Type taskType = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("SEAN.Tasks.RandomABNav"))
+            .First(t => t != null);
+        var go = new GameObject("uninitialized task");
+        try
+        {
+            Component task = go.AddComponent(taskType);
+            Type baseType = taskType.BaseType;
+            var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            baseType.GetField("timer", flags).SetValue(task, 11f);
+            baseType.GetField("debounceStartupTime", flags).SetValue(task, Time.time);
+            Assert.DoesNotThrow(() => baseType.GetMethod("Update").Invoke(task, null));
+        }
+        finally { UnityEngine.Object.DestroyImmediate(go); }
+    }
     [Test] public void MissingNavigationFailsWithoutAnOriginFallback()
     {
         Assert.That(Pair(out Vector3 start, out Vector3 goal), Is.False);

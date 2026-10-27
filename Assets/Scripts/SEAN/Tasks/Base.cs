@@ -189,7 +189,7 @@ namespace SEAN.Tasks
             CheckNewTask();
             // rotate the target
             timer += Time.deltaTime;
-            if (PublishGoal && (timer >= publishInterval))
+            if (PublishGoal && isRunning && (timer >= publishInterval))
             {
                 timer = 0;
                 Publish(interactiveGoal);
