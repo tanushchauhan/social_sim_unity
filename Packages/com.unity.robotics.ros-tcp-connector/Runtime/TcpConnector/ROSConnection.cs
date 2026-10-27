@@ -69,6 +69,8 @@ namespace Unity.Robotics.ROSTCPConnector
         {
             ConcurrentQueue<OutgoingMessageSender> m_OutgoingMessageQueue;
             public readonly ManualResetEvent NewMessageReadyToSendEvent;
+            readonly object lifecycleLock = new object();
+            bool disposed;
 
             public OutgoingMessageQueue()
             {
@@ -78,8 +80,22 @@ namespace Unity.Robotics.ROSTCPConnector
 
             public void Enqueue(OutgoingMessageSender outgoingMessageSender)
             {
-                m_OutgoingMessageQueue.Enqueue(outgoingMessageSender);
-                NewMessageReadyToSendEvent.Set();
+                lock (lifecycleLock)
+                {
+                    if (disposed) return;
+                    m_OutgoingMessageQueue.Enqueue(outgoingMessageSender);
+                    NewMessageReadyToSendEvent.Set();
+                }
+            }
+
+            public void Dispose()
+            {
+                lock (lifecycleLock)
+                {
+                    if (disposed) return;
+                    disposed = true;
+                    NewMessageReadyToSendEvent.Dispose();
+                }
             }
 
             public bool TryDequeue(out OutgoingMessageSender outgoingMessageSender)
@@ -92,6 +108,7 @@ namespace Unity.Robotics.ROSTCPConnector
 
         ConcurrentQueue<Tuple<string, byte[]>> m_IncomingMessages = new ConcurrentQueue<Tuple<string, byte[]>>();
         CancellationTokenSource m_ConnectionThreadCancellation;
+        Task m_ConnectionTask;
         public bool HasConnectionThread => m_ConnectionThreadCancellation != null;
 
         static bool m_HasConnectionError = false;
@@ -297,9 +314,8 @@ namespace Unity.Robotics.ROSTCPConnector
         // Send a request to a ros service
         public async Task<RESPONSE> SendServiceMessage<RESPONSE>(string rosServiceName, Message serviceRequest) where RESPONSE : Message, new()
         {
-            m_MessageSerializer.Clear();
-            m_MessageSerializer.SerializeMessage(serviceRequest);
-            byte[] requestBytes = m_MessageSerializer.GetBytes();
+            // Outgoing serialization happens in TopicMessageSender; do not mutate
+            // the system-command serializer from this asynchronous service path.
             TaskPauser pauser = new TaskPauser();
 
             int srvID;
@@ -421,7 +437,7 @@ namespace Unity.Robotics.ROSTCPConnector
             public void SendPublisherRegistration(string topic, string message_name, int queueSize, bool latch, NetworkStream stream = null)
             {
                 m_Self.SendSysCommand(SysCommand.k_SysCommand_Publish,
-                    new SysCommand_PublisherRegistration { topic = topic, message_name = message_name, queue_size = queueSize, latch = latch }
+                    new SysCommand_PublisherRegistration { topic = topic, message_name = message_name, queue_size = queueSize, latch = latch }, stream
                 );
             }
 
@@ -505,9 +521,10 @@ namespace Unity.Robotics.ROSTCPConnector
             if (!IPFormatIsCorrect(RosIPAddress))
                 Debug.LogWarning("Invalid ROS IP address: " + RosIPAddress);
 
-            m_ConnectionThreadCancellation = new CancellationTokenSource();
+            var cancellation = new CancellationTokenSource();
+            m_ConnectionThreadCancellation = cancellation;
 
-            Task.Run(() => ConnectionThread(
+            m_ConnectionTask = Task.Run(() => ConnectionThread(
                 RosIPAddress,
                 RosPort,
                 m_NetworkTimeoutSeconds,
@@ -517,7 +534,7 @@ namespace Unity.Robotics.ROSTCPConnector
                 OnConnectionLostCallback,
                 m_OutgoingMessageQueue,
                 m_IncomingMessages,
-                m_ConnectionThreadCancellation.Token
+                cancellation.Token
             ));
         }
 
@@ -530,7 +547,7 @@ namespace Unity.Robotics.ROSTCPConnector
                 topics = AllTopics.ToArray();
             }
 
-            foreach (RosTopicState topicInfo in m_Topics.Values.ToArray())
+            foreach (RosTopicState topicInfo in topics)
                 topicInfo.OnConnectionEstablished(stream);
 
             RefreshTopicsList();
@@ -553,10 +570,20 @@ namespace Unity.Robotics.ROSTCPConnector
 
         public void Disconnect()
         {
-            m_ConnectionThreadCancellation?.Cancel();
-            //The thread may be waiting on a ManualResetEvent, if so, this will wake it so it can exit immediately.
-            m_OutgoingMessageQueue?.NewMessageReadyToSendEvent?.Set();
+            var cancellation = m_ConnectionThreadCancellation;
+            if (cancellation == null) return;
+            cancellation.Cancel();
+            m_OutgoingMessageQueue.NewMessageReadyToSendEvent.Set();
+            // Worker cleanup uses only thread-safe queues and sockets, never the
+            // Unity main thread. Join it before a replacement scene can connect.
+            if (m_ConnectionTask != null && !m_ConnectionTask.Wait(4000))
+            {
+                Debug.LogError("ROS connection worker did not stop within four seconds.");
+                return;
+            }
+            m_ConnectionTask = null;
             m_ConnectionThreadCancellation = null;
+            cancellation.Dispose();
         }
 
         void OnValidate()
@@ -784,22 +811,35 @@ namespace Unity.Robotics.ROSTCPConnector
             {
                 TcpClient client = null;
                 CancellationTokenSource readerCancellation = null;
+                Task readerTask = null;
+                NetworkStream networkStream = null;
+                bool established = false;
 
                 try
                 {
                     ROSConnection.m_HasConnectionError = true; // until we actually see a reply back, assume there's a problem
 
                     client = new TcpClient();
-                    client.Connect(rosIPAddress, rosPort);
-
-                    NetworkStream networkStream = client.GetStream();
+                    using (var connectTimeout = CancellationTokenSource.CreateLinkedTokenSource(token))
+                    {
+                        connectTimeout.CancelAfter((int)(networkTimeoutSeconds * 1000));
+                        using (connectTimeout.Token.Register(() => client.Close()))
+                        {
+                            client.Connect(rosIPAddress, rosPort);
+                            token.ThrowIfCancellationRequested();
+                            if (connectTimeout.IsCancellationRequested)
+                                throw new TimeoutException("ROS TCP connect timed out.");
+                        }
+                    }
+                    networkStream = client.GetStream();
                     networkStream.ReadTimeout = (int)(networkTimeoutSeconds * 1000);
 
                     SendKeepalive(networkStream);
                     OnConnectionStartedCallback(networkStream);
 
                     readerCancellation = new CancellationTokenSource();
-                    _ = Task.Run(() => ReaderThread(nextReaderIdx, networkStream, incomingQueue, sleepMilliseconds, readerCancellation.Token));
+                    readerTask = Task.Run(() => ReaderThread(nextReaderIdx, networkStream, incomingQueue, sleepMilliseconds, readerCancellation.Token));
+                    established = true;
                     nextReaderIdx++;
 
                     // connected, now just watch our queue for outgoing messages to send (or else send a keepalive message occasionally)
@@ -808,6 +848,11 @@ namespace Unity.Robotics.ROSTCPConnector
                     {
                         bool messageReadyEventWasSet = outgoingQueue.NewMessageReadyToSendEvent.WaitOne(sleepMilliseconds);
                         token.ThrowIfCancellationRequested();
+                        if (readerTask.IsCompleted)
+                        {
+                            await readerTask;
+                            throw new System.IO.EndOfStreamException("ROS endpoint closed the connection unexpectedly.");
+                        }
 
                         if (messageReadyEventWasSet)
                         {
@@ -824,6 +869,12 @@ namespace Unity.Robotics.ROSTCPConnector
 
                         while (outgoingQueue.TryDequeue(out OutgoingMessageSender sendsOutgoingMessages))
                         {
+                            token.ThrowIfCancellationRequested();
+                            if (readerTask.IsCompleted)
+                            {
+                                await readerTask;
+                                throw new System.IO.EndOfStreamException("ROS endpoint closed the connection unexpectedly.");
+                            }
                             OutgoingMessageSender.SendToState sendToState = sendsOutgoingMessages.SendInternal(messageSerializer, networkStream);
                             switch (sendToState)
                             {
@@ -859,60 +910,63 @@ namespace Unity.Robotics.ROSTCPConnector
                 {
                     ROSConnection.m_HasConnectionError = true;
                     Debug.Log($"Connection to {rosIPAddress}:{rosPort} failed - " + e);
-                    await Task.Delay(nextReconnectionDelay);
+
                 }
                 finally
                 {
-                    if (readerCancellation != null)
-                        readerCancellation.Cancel();
-
-                    if (client != null)
-                        client.Close();
-
-                    // clear the message queue
+                    if (readerTask != null && readerTask.IsFaulted)
+                        Debug.Log("Reader " + nextReaderIdx + " exception! " + readerTask.Exception.InnerException);
+                    if (established && token.IsCancellationRequested && readerTask != null && !readerTask.IsCompleted)
+                    {
+                        try
+                        {
+                            // This marker follows all completed outgoing frames. Half-close
+                            // writes, but keep reading until the endpoint drains and sends FIN.
+                            SendSysCommandImmediate("__disconnect", new SysCommand_TopicsRequest(), networkStream);
+                            client.Client.Shutdown(SocketShutdown.Send);
+                            if (await Task.WhenAny(readerTask, Task.Delay(2000)) != readerTask)
+                                Debug.LogError("ROS graceful disconnect timed out.");
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.LogError("ROS graceful disconnect failed: " + e.Message);
+                        }
+                    }
+                    readerCancellation?.Cancel();
+                    client?.Close();
+                    if (readerTask != null)
+                    {
+                        try { await readerTask; }
+                        catch (OperationCanceledException) { }
+                        catch (Exception) when (readerCancellation.IsCancellationRequested) { }
+                    }
+                    readerCancellation?.Dispose();
                     ClearMessageQueue(outgoingQueue);
                     DeregisterAll();
                 }
-                await Task.Yield();
+                if (!token.IsCancellationRequested)
+                {
+                    try { await Task.Delay(nextReconnectionDelay, token); }
+                    catch (OperationCanceledException) { }
+                }
             }
         }
 
         static async Task ReaderThread(int readerIdx, NetworkStream networkStream, ConcurrentQueue<Tuple<string, byte[]>> queue, int sleepMilliseconds, CancellationToken token)
         {
-            // First message should be the handshake
-            Tuple<string, byte[]> handshakeContent = await ReadMessageContents(networkStream, sleepMilliseconds, token);
-            if (handshakeContent.Item1 == SysCommand.k_SysCommand_Handshake)
-            {
-                ROSConnection.m_HasConnectionError = false;
-                queue.Enqueue(handshakeContent);
-            }
-            else
-            {
-                Debug.LogError($"Invalid ROS-TCP-Endpoint version detected: 0.6.0 or older. Expected: {k_Version}.");
-            }
-
+            // Buffers belong to this reader, never to a departing/replacement pair.
+            var reader = new MessageReader();
+            Tuple<string, byte[]> handshakeContent = await reader.Read(networkStream, sleepMilliseconds, token);
+            if (handshakeContent == null || handshakeContent.Item1 != SysCommand.k_SysCommand_Handshake)
+                throw new System.IO.InvalidDataException($"Expected ROS-TCP handshake {k_Version}; received [{handshakeContent?.Item1}] length={handshakeContent?.Item1.Length}.");
+            ROSConnection.m_HasConnectionError = false;
+            queue.Enqueue(handshakeContent);
             while (!token.IsCancellationRequested)
             {
-                try
-                {
-                    Tuple<string, byte[]> content = await ReadMessageContents(networkStream, sleepMilliseconds, token);
-                    ROSConnection.m_HasConnectionError = false;
-
-                    if (content.Item1 != "") // ignore keepalive messages
-                        queue.Enqueue(content);
-                }
-                catch (OperationCanceledException)
-                {
-                }
-                catch (Exception) when (token.IsCancellationRequested)
-                {
-                    // Closing a scene can interrupt an in-flight socket write.
-                }
-                catch (Exception e)
-                {
-                    ROSConnection.m_HasConnectionError = true;
-                    Debug.Log("Reader " + readerIdx + " exception! " + e);
-                }
+                Tuple<string, byte[]> content = await reader.Read(networkStream, sleepMilliseconds, token);
+                if (content == null) return; // orderly FIN after an entire frame
+                ROSConnection.m_HasConnectionError = false;
+                if (content.Item1 != "") queue.Enqueue(content);
             }
         }
 
@@ -921,46 +975,48 @@ namespace Unity.Robotics.ROSTCPConnector
             int read = 0;
             while (read < length && networkStream.CanRead)
             {
-                while (!token.IsCancellationRequested && !networkStream.DataAvailable)
-                    await Task.Delay(sleepMilliseconds);
-
                 token.ThrowIfCancellationRequested();
-                read += await networkStream.ReadAsync(array, read, length - read, token);
+                int count = await networkStream.ReadAsync(array, read, length - read, token);
+                if (count == 0) throw new System.IO.EndOfStreamException("ROS TCP stream ended mid-frame.");
+                read += count;
             }
-
-            if (read < length)
-                throw new SocketException(); // the connection has closed
+            if (read < length) throw new System.IO.EndOfStreamException("ROS TCP stream ended mid-frame.");
         }
 
-        static byte[] s_FourBytes = new byte[4];
-        static byte[] s_TopicScratchSpace = new byte[64];
-
-        static async Task<Tuple<string, byte[]>> ReadMessageContents(NetworkStream networkStream, int sleepMilliseconds, CancellationToken token)
+        class MessageReader
         {
-            // Get first bytes to determine length of topic name
-            await ReadToByteArray(networkStream, s_FourBytes, 4, sleepMilliseconds, token);
-            int topicLength = BitConverter.ToInt32(s_FourBytes, 0);
+            readonly byte[] fourBytes = new byte[4];
+            byte[] topicScratch = new byte[64];
 
-            // If our topic buffer isn't large enough, make a larger one (and keep it that size; assume that's the new standard)
-            if (topicLength > s_TopicScratchSpace.Length)
-                s_TopicScratchSpace = new byte[topicLength];
-
-            // Read and convert topic name
-            await ReadToByteArray(networkStream, s_TopicScratchSpace, topicLength, sleepMilliseconds, token);
-            string topicName = Encoding.ASCII.GetString(s_TopicScratchSpace, 0, topicLength);
-
-            await ReadToByteArray(networkStream, s_FourBytes, 4, sleepMilliseconds, token);
-            int full_message_size = BitConverter.ToInt32(s_FourBytes, 0);
-
-            byte[] readBuffer = new byte[full_message_size];
-            await ReadToByteArray(networkStream, readBuffer, full_message_size, sleepMilliseconds, token);
-
-            return Tuple.Create(topicName, readBuffer);
+            public async Task<Tuple<string, byte[]>> Read(NetworkStream stream, int sleepMilliseconds, CancellationToken token)
+            {
+                // Read the first byte separately to distinguish orderly frame-boundary
+                // EOF from a truncated header or payload.
+                int count = await stream.ReadAsync(fourBytes, 0, 1, token);
+                if (count == 0) return null;
+                byte[] rest = new byte[3];
+                await ReadToByteArray(stream, rest, 3, sleepMilliseconds, token);
+                Array.Copy(rest, 0, fourBytes, 1, 3);
+                int topicLength = BitConverter.ToInt32(fourBytes, 0);
+                if (topicLength < 0 || topicLength > 1024 * 1024)
+                    throw new System.IO.InvalidDataException("Invalid ROS TCP topic length.");
+                if (topicLength > topicScratch.Length) topicScratch = new byte[topicLength];
+                await ReadToByteArray(stream, topicScratch, topicLength, sleepMilliseconds, token);
+                string topic = Encoding.ASCII.GetString(topicScratch, 0, topicLength).TrimEnd('\0');
+                await ReadToByteArray(stream, fourBytes, 4, sleepMilliseconds, token);
+                int length = BitConverter.ToInt32(fourBytes, 0);
+                if (length < 0 || length > 256 * 1024 * 1024)
+                    throw new System.IO.InvalidDataException("Invalid ROS TCP payload length.");
+                byte[] payload = new byte[length];
+                await ReadToByteArray(stream, payload, length, sleepMilliseconds, token);
+                return Tuple.Create(topic, payload);
+            }
         }
 
         void OnDestroy()
         {
             Disconnect();
+            if (m_ConnectionTask == null) m_OutgoingMessageQueue.Dispose();
             HudPanel.UnregisterHeader(DrawHeaderGUI);
             if (_instance == this)
                 _instance = null;
@@ -1004,8 +1060,11 @@ namespace Unity.Robotics.ROSTCPConnector
 
         public void QueueSysCommand(string command, object param)
         {
-            PopulateSysCommand(m_MessageSerializer, command, param);
-            m_OutgoingMessageQueue.Enqueue(new SysCommandSender(m_MessageSerializer.GetBytesSequence()));
+            lock (m_MessageSerializer)
+            {
+                PopulateSysCommand(m_MessageSerializer, command, param);
+                m_OutgoingMessageQueue.Enqueue(new SysCommandSender(m_MessageSerializer.GetBytesSequence()));
+            }
         }
 
         [Obsolete("Use Publish instead of Send", false)]
