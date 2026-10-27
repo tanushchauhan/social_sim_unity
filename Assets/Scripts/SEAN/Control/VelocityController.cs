@@ -21,6 +21,9 @@ namespace SEAN.Control
         {
             base.Start();
             rb = sean.robot.base_link.GetComponent<Rigidbody>();
+            var material = VelocityBodyMaterial.Apply(rb);
+            Debug.Log("SEAN velocity-controlled robot: " + sean.robot.name + ", body: " + rb.name
+                + ", contact material: " + material.name);
             task = sean.robotTask;
             task.onNewTask += Stop;
         }

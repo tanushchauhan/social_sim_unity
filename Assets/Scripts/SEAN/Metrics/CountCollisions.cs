@@ -27,6 +27,8 @@ namespace SEAN.Metrics
                 throw new System.Exception("CountCollisions can only be attached to objects with exactly one existing CapsuleCollider");
             }
             CapsuleCollider rigidCollider = GetComponent<CapsuleCollider>();
+            var contacts = gameObject.AddComponent<ObjectContactSensor>();
+            contacts.Contact += () => sean.metrics.IncrementObjectCollisions();
             // Personal Space
             CapsuleCollider personalSpaceCollider = gameObject.AddComponent<CapsuleCollider>();
             personalSpaceCollider.isTrigger = true;
@@ -86,11 +88,7 @@ namespace SEAN.Metrics
 
             if (!(hit.gameObject.tag.Equals(SEAN.AgentTag) || hit.gameObject.tag.Equals(SEAN.GroupTag)))
             {
-                if (ShowDebug)
-                {
-                    print("At vel " + v + ", " + vel + " ObjectCollision with " + hit.gameObject.name + " is a trigger? " + hit.isTrigger);
-                }
-                sean.metrics.IncrementObjectCollisions();
+                // Personal-space triggers do not establish physical object contact.
                 return;
             }
 
