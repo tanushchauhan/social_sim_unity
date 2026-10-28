@@ -21,7 +21,7 @@ namespace SEAN.Scenario.Agents
         }
         [Serializable] public class Sample
         {
-            public float time;
+            public float time, robotYaw;
             public Vector3 robot, robotVelocity;
             public Vector3[] people;
             public float[] robotClearances, personClearances, goalDistances;
@@ -235,7 +235,7 @@ namespace SEAN.Scenario.Agents
                     }
                 }
                 SetRobot(current.robotStart,Quaternion.LookRotation((goal-start).normalized == Vector3.zero ? Vector3.forward : (goal-start).normalized));
-                body.constraints = RigidbodyConstraints.FreezeRotation | RigidbodyConstraints.FreezePositionY;
+                ConfigureMotion(body,kind == "nav2");
                 if (kind == "nav2") foreach (var controller in controllers) controller.enabled = true;
                 for (int i = 0; i < 4; i++)
                 {
@@ -278,6 +278,11 @@ namespace SEAN.Scenario.Agents
             report.complete = true; Save(output,report);
             Save(Path.Combine(exchange,"request.json"),new Request { complete = true });
             Debug.Log("Warehouse encounters complete: " + output);
+        }
+        public static void ConfigureMotion(Rigidbody rigidbody, bool nav2)
+        {
+            rigidbody.constraints = RigidbodyConstraints.FreezePositionY | RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+            if (!nav2) rigidbody.constraints |= RigidbodyConstraints.FreezeRotationY;
         }
         private void FreezeRobot()
         {
@@ -325,7 +330,7 @@ namespace SEAN.Scenario.Agents
             var gaps = new List<float>();
             for (int i = 0; i < agents.Length; i++) for (int j = i+1; j < agents.Length; j++)
                 gaps.Add(Horizontal(positions[i],positions[j])-current.people[i].radius-current.people[j].radius);
-            return new Sample { time = time, robot = body.position, robotVelocity = body.velocity, people = positions,
+            return new Sample { time = time, robotYaw = body.rotation.eulerAngles.y, robot = body.position, robotVelocity = body.velocity, people = positions,
                 robotClearances = positions.Select((p,i) => shapes.Min(c => RobotClearance(c,p))-current.people[i].radius).ToArray(),
                 personClearances = gaps.ToArray(), goalDistances = positions.Select((p,i) => Horizontal(p,current.people[i].goal)).ToArray(), yielding = yielding };
         }
