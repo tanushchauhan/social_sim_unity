@@ -146,3 +146,7 @@ acceptance rules and outcomes. Its controlled stepping and planar robot
 constraints apply only when explicitly enabled. Normal scenarios retain their
 existing task/control behavior. A successful diagnostic subset is not a full
 populated-simulator release qualification.
+
+The encounter JSON and its case index are authoritative for this diagnostic.
+The normal random task is disabled; its legacy TrialInfo task timer/goal are
+not reset for each fixture case and must not be used as encounter metrics.

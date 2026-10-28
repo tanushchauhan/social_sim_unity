@@ -224,7 +224,9 @@ namespace SEAN.Scenario.Agents
                 if (kind == "nav2")
                 {
                     Save(Path.Combine(exchange,"request.json"),new Request { index = current.index, robotStart = current.robotStart, robotGoal = goal, expectedPeople = 4 });
-                    Save(output,report);
+                    // The complete trajectory snapshot was saved before publishing
+                    // this request. Never pause Unity for a large write after Nav2
+                    // can accept an action and start monitoring live sensors.
                     float until = Time.realtimeSinceStartup + 120;
                     while (!File.Exists(Path.Combine(exchange,"go-"+current.index)) && Time.realtimeSinceStartup < until) yield return null;
                     if (!File.Exists(Path.Combine(exchange,"go-"+current.index)))
@@ -351,8 +353,10 @@ namespace SEAN.Scenario.Agents
         }
         private static void Save<T>(string path, T data)
         {
+            float started = Time.realtimeSinceStartup;
             File.WriteAllText(path+".tmp",JsonUtility.ToJson(data,true));
             if (File.Exists(path)) File.Replace(path+".tmp",path,null); else File.Move(path+".tmp",path);
+            if (typeof(T) == typeof(Report)) Debug.Log("Warehouse report write wall seconds: " + (Time.realtimeSinceStartup-started));
         }
     }
     public class WarehouseEncounterPopulation : PedestrianBehavior.Base
