@@ -271,6 +271,25 @@ public class MigrationTests
     }
 
     [Test]
+    public void FrameTransformsPublishAsOneMessage()
+    {
+        Type batch = FindType("SEAN.TF.TransformBatch");
+        Type transformType = FindType("RosMessageTypes.Geometry.TransformStampedMsg");
+        batch.GetMethod("Clear").Invoke(null, null);
+        Assert.That(batch.GetMethod("Take").Invoke(null, null), Is.Null);
+        var transforms = new object[3];
+        for (int i = 0; i < transforms.Length; i++)
+        {
+            transforms[i] = Activator.CreateInstance(transformType);
+            batch.GetMethod("Add").Invoke(null, new[] { transforms[i] });
+        }
+        object message = batch.GetMethod("Take").Invoke(null, null);
+        var sent = (Array)message.GetType().GetField("transforms").GetValue(message);
+        Assert.That(sent, Is.EqualTo(transforms));
+        Assert.That(batch.GetMethod("Take").Invoke(null, null), Is.Null, "A frame's transforms were sent twice");
+    }
+
+    [Test]
     public void PublisherRegistersAgainAfterConnectionReplacement()
     {
         Type connectionType = FindType("Unity.Robotics.ROSTCPConnector.ROSConnection");

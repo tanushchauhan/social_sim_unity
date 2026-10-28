@@ -10,6 +10,27 @@ using System.Collections.Generic;
 
 namespace SEAN.TF
 {
+    // Collects one frame's transforms so /tf crosses the TCP bridge as one message
+    // instead of one message per transform; per-message endpoint cost caused a growing backlog.
+    public static class TransformBatch
+    {
+        private static readonly List<RosMessageTypes.Geometry.TransformStampedMsg> pending =
+            new List<RosMessageTypes.Geometry.TransformStampedMsg>();
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        public static void Clear() { pending.Clear(); }
+
+        public static void Add(RosMessageTypes.Geometry.TransformStampedMsg transform) { pending.Add(transform); }
+
+        public static RosMessageTypes.Tf2.TFMessageMsg Take()
+        {
+            if (pending.Count == 0) { return null; }
+            var message = new RosMessageTypes.Tf2.TFMessageMsg(pending.ToArray());
+            pending.Clear();
+            return message;
+        }
+    }
+
     public class BaseTransformPublisher : MonoBehaviour
     {
         private ROSConnection ros;
@@ -59,10 +80,17 @@ namespace SEAN.TF
                 tf.transform.translation.y = transform.pose.pose.position.y;
                 tf.transform.translation.z = transform.pose.pose.position.z;
                 tf.transform.rotation = transform.pose.pose.orientation;
-                ros.PublishAuto("/tf", new RosMessageTypes.Tf2.TFMessageMsg(new[] { tf }));
+                TransformBatch.Add(tf);
             }
             LastHeader.sec = transforms[0].pose.header.stamp.sec;
             LastHeader.nanosec = transforms[0].pose.header.stamp.nanosec;
+        }
+
+        // Every Update has run before the first LateUpdate, so one publisher sends the whole frame.
+        protected void LateUpdate()
+        {
+            var message = TransformBatch.Take();
+            if (message != null) { ros.PublishAuto("/tf", message); }
         }
     }
 }
