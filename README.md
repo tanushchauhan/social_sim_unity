@@ -12,6 +12,27 @@ identifies the upstream revision and scene-lifecycle fixes. Scene destruction
 now cancels the old connection worker and removes its HUD header. Use the
 matching ROS integration's `sean_tcp_endpoint` for subscriber removal support.
 
+## Pedestrian robot response
+
+`IVI.SFAgent.robotResponse` selects the versioned `ColliderV1` model (default)
+or `Legacy` for comparison. ColliderV1 uses physical colliders belonging to the
+selected robot body, actual robot velocity, braking that survives the legacy
+force limits, and sidestepping away from the body. Sidestepping starts within a bounded three-metre surface range, with the legacy
+slow-walking side-force gain and a smooth onset. Pedestrian desired/max speed,
+person/person forces and wall-force parameters retain their previous values.
+An exactly centred passing-side tie keeps the legacy tangent bias. This is an
+engineered response model, not a calibration against human observations.
+
+The opt-in `-pedestrian-validation-output /absolute/path/report.json` diagnostic
+uses production Kuri and animated pedestrians on a separate open floor in the
+Warehouse player. It controls frame/physics steps explicitly and records raw
+trajectories, independent horizontal body clearance and physical contacts.
+`-pedestrian-validation-model Legacy` retains the old response for comparison;
+`-pedestrian-validation-seeds 7,42` and `-pedestrian-validation-step 0.02` select
+the fixture parameters. Without the output flag the diagnostic is not installed
+and does not change simulation stepping. See the coordination repository's
+`PEDESTRIAN_AVOIDANCE.md` and dated result for acceptance and limitations.
+
 ## Migration checks
 
 Open the project with the pinned editor, let package import finish, and run

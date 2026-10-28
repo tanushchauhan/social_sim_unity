@@ -24,6 +24,10 @@ namespace IVI
 
         //ROBOT REPULSION
         private float robotRepulsion;
+        public SEAN.Scenario.Agents.RobotResponse robotResponse = SEAN.Scenario.Agents.RobotResponse.ColliderV1;
+        private Rigidbody robotBody;
+        private Collider[] robotColliders;
+        private Vector3 robotForce;
 
         protected override void Start()
         {
@@ -38,6 +42,11 @@ namespace IVI
                     GO2Agent.Add(robot, null);
                 }
                 neighbors.Add(robot);
+                if (robotResponse == SEAN.Scenario.Agents.RobotResponse.ColliderV1)
+                {
+                    robotBody = SEAN.SEAN.instance.robot.base_link.GetComponent<Rigidbody>();
+                    robotColliders = SEAN.Scenario.Agents.RobotAvoidance.BodyColliders(robotBody);
+                }
             }
 
             GO2Agent.Add(gameObject, this);
@@ -56,6 +65,9 @@ namespace IVI
             var accel = totalForce.force / MASS;
             Vector3 nextVelocity = velocity + accel * Time.deltaTime;
             nextVelocity.y = 0;
+            Vector3 goalDirection = nearestGoalPoint-transform.position;
+            if (robotResponse == SEAN.Scenario.Agents.RobotResponse.ColliderV1 && Vector3.Dot(robotForce,goalDirection) < 0)
+                nextVelocity = SEAN.Scenario.Agents.RobotAvoidance.PreventRobotInducedReverse(nextVelocity,goalDirection);
             if (nextVelocity.sqrMagnitude > 0)
             {
                 nextVelocity = nextVelocity.normalized * Mathf.Min(nextVelocity.magnitude, Parameters.MAX_VEL);
@@ -134,6 +146,16 @@ namespace IVI
             //    totalForce.force = totalForce.force.normalized * Mathf.Min(totalForce.force.magnitude, 200);
             //}
 
+            robotForce = Vector3.zero;
+            if (robotResponse == SEAN.Scenario.Agents.RobotResponse.ColliderV1 && robotBody != null)
+            {
+                robotForce = SEAN.Scenario.Agents.RobotAvoidance.Force(transform.position,velocity,
+                    nearestGoalPoint-transform.position,robotBody,robotColliders,MASS,out bool inFront,out bool approaching);
+                // Robot braking and sidestepping must survive the legacy backward/lateral limits.
+                totalForce.force += robotForce;
+                totalForce.anyAgentInFront |= inFront;
+                totalForce.anyAgentApproaching |= inFront && approaching;
+            }
             return totalForce;
         }
 
@@ -170,6 +192,7 @@ namespace IVI
                     }
                     else
                     {
+                        if (robotResponse == SEAN.Scenario.Agents.RobotResponse.ColliderV1) continue;
                         SEAN.Scenario.Robot robot = n.GetComponent<SEAN.Scenario.Robot>();
                         dir = transform.position - robot.transform.position;
                         dir.y = 0;
