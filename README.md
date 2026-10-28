@@ -131,3 +131,18 @@ In case some files get committed or edited and no longer adhere to this style, t
 dotnet tool install -g dotnet-format
 dotnet format social_sim_unity.sln
 ```
+
+The separate opt-in `-warehouse-encounter-output /absolute/path/encounters.json`
+fixture uses the actual Warehouse floor, racks and baked NavMesh with four
+production animated pedestrians. It compares absent, parked, oracle-yielding,
+oblivious and real Nav2 conditions in fixed mirrored aisle/rack-end layouts.
+It exposes the population through the existing ROS agent publishers; Nav2
+uses normal laser/odometry streams and actions. Completed people remain at
+ordered terminal goals. Dense terminal queues are not qualified by this fixture.
+
+Use the coordination repository's `scripts/check_warehouse_encounters.sh` and
+`WAREHOUSE_ENCOUNTERS.md` for the external Nav2 handshake, full measurements,
+acceptance rules and outcomes. Its controlled stepping and planar robot
+constraints apply only when explicitly enabled. Normal scenarios retain their
+existing task/control behavior. A successful diagnostic subset is not a full
+populated-simulator release qualification.
