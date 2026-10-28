@@ -65,7 +65,7 @@ namespace SEAN.Scenario.Agents
             int[] seeds = index < 0 ? new[] { 7, 42 } : args[index+1].Split(',').Select(int.Parse).ToArray();
             if (step != .02f && step != .04f) throw new ArgumentException("Supported steps: .02 or .04");
             Time.captureDeltaTime = Time.fixedDeltaTime = step;
-            Application.targetFrameRate = 100;
+            Application.targetFrameRate = Mathf.RoundToInt(1/step);
             QualitySettings.vSyncCount = 0;
             index = Array.IndexOf(args, "-pedestrian-validation-model");
             var model = index < 0 ? RobotResponse.ColliderV1 : (RobotResponse)Enum.Parse(typeof(RobotResponse),args[index+1]);
@@ -123,8 +123,10 @@ namespace SEAN.Scenario.Agents
                 NavMeshHit hit;
                 if (!NavMesh.SamplePosition(goal, out hit,.25f,NavMesh.AllAreas))
                     throw new InvalidOperationException("Diagnostic goal not on NavMesh");
-                if (Vector3.Distance(body.position, robotStart) > .01f)
-                    throw new InvalidOperationException("Diagnostic robot did not remain at requested start: " + body.position + " vs " + robotStart);
+                Vector3 initializedStart = robotStart;
+                if (kind == "moving" || kind == "yielding") initializedStart += Vector3.forward*.3f*step;
+                if (Vector3.Distance(body.position, initializedStart) > .002f)
+                    throw new InvalidOperationException("Diagnostic robot initialization drift: " + body.position + " vs " + initializedStart);
                 person.InitDest(goal);
                 var episode = new Episode { seed = seed, mode = kind, offset = offset, heading = heading, avatar = avatar.name, expectedRobotStart = robotStart };
                 report.episodes.Add(episode);
