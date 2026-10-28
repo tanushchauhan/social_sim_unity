@@ -20,8 +20,10 @@ public class WarehouseMotionTests
         {
             Time.captureDeltaTime = .02f;
             Application.targetFrameRate = -1;
+            go.transform.position = new Vector3(0,2,0);
             var body = go.AddComponent<Rigidbody>();
-            body.position = new Vector3(0,2,0);
+            Physics.SyncTransforms();
+            Assert.That(body.position.y,Is.EqualTo(2).Within(.001f));
             var fixture = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("SEAN.Scenario.Agents.WarehouseEncounterValidation")).First(t => t != null);
             fixture.GetMethod("ConfigureMotion").Invoke(null,new object[] { body,true });
             for (int i = 0; i < 30; i++)
