@@ -5,6 +5,8 @@ using UnityEngine.AI;
 
 namespace IVI
 {
+    public enum PedestrianContactModel { Legacy, VelocityBodyV1 }
+
     public class SFAgent : SEAN.Scenario.Agents.Base
     {
 
@@ -25,6 +27,7 @@ namespace IVI
         //ROBOT REPULSION
         private float robotRepulsion;
         public SEAN.Scenario.Agents.RobotResponse robotResponse = SEAN.Scenario.Agents.RobotResponse.ColliderV1;
+        public PedestrianContactModel contactModel = PedestrianContactModel.VelocityBodyV1;
         private Rigidbody robotBody;
         private Collider[] robotColliders;
         private Vector3 robotForce;
@@ -32,6 +35,8 @@ namespace IVI
         protected override void Start()
         {
             base.Start();
+            if (contactModel == PedestrianContactModel.VelocityBodyV1)
+                SEAN.Control.VelocityBodyMaterial.Apply(rb);
 
             if (SEAN.SEAN.instance != null)
             {

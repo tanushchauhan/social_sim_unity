@@ -30,7 +30,8 @@ namespace SEAN.Scenario.Agents
         [Serializable] public class Report
         {
             public string fixture = "open floor, production Kuri and animated SFAgent";
-            public string model;
+            public string model, contactModel;
+            public string[] modes;
             public int[] seeds;
             public float step, desiredSpeed = Parameters.DESIRED_SPEED;
             public bool complete;
@@ -69,7 +70,14 @@ namespace SEAN.Scenario.Agents
             QualitySettings.vSyncCount = 0;
             index = Array.IndexOf(args, "-pedestrian-validation-model");
             var model = index < 0 ? RobotResponse.ColliderV1 : (RobotResponse)Enum.Parse(typeof(RobotResponse),args[index+1]);
-            var report = new Report { step = step, seeds = seeds, model = model.ToString() };
+            index = Array.IndexOf(args, "-pedestrian-validation-modes");
+            string[] modes = index < 0 ? new[] { "parked", "absent", "moving", "yielding" } : args[index+1].Split(',');
+            if (modes.Length == 0 || modes.Distinct().Count() != modes.Length || modes.Any(m => !new[] { "parked", "absent", "moving", "yielding" }.Contains(m)))
+                throw new ArgumentException("Unknown or duplicate diagnostic mode");
+            index = Array.IndexOf(args, "-pedestrian-validation-contact");
+            string contactModel = index < 0 ? "VelocityBodyV1" : args[index+1];
+            if (contactModel != "Legacy" && contactModel != "VelocityBodyV1") throw new ArgumentException("Unknown contact model");
+            var report = new Report { step = step, seeds = seeds, model = model.ToString(), modes = modes, contactModel = contactModel };
             var robot = SEAN.instance.robot;
             SEAN.instance.robotTask.enabled = false;
             foreach (var controller in FindObjectsOfType<global::SEAN.Control.VelocityController>()) controller.enabled = false;
@@ -99,7 +107,7 @@ namespace SEAN.Scenario.Agents
             navMesh = NavMesh.AddNavMeshData(data);
             var template = Resources.Load<GameObject>("Prefabs/RocketboxRandomAnimatedAgent").GetComponent<RandomAvatar>();
             foreach (int seed in seeds)
-            foreach (string kind in new[] { "parked", "absent", "moving", "yielding" })
+            foreach (string kind in modes)
             foreach (float heading in kind == "parked" ? new[] { 0f, 180f } : new[] { 0f })
             foreach (float offset in kind == "parked" ? new[] { -.35f, 0f, .35f } : new[] { -.35f, .35f })
             {
@@ -117,6 +125,7 @@ namespace SEAN.Scenario.Agents
                 avatar.GetComponent<Animator>().runtimeAnimatorController = template.animationController;
                 person = avatar.AddComponent<IVI.SFAgent>();
                 person.robotResponse = model;
+                person.contactModel = (IVI.PedestrianContactModel)Enum.Parse(typeof(IVI.PedestrianContactModel),contactModel);
                 // Start initializes the production animator, body, perception and planner.
                 yield return null;
                 var goal = origin + new Vector3(offset,0,-3);
