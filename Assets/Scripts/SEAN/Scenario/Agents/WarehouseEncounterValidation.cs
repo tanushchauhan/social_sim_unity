@@ -43,7 +43,8 @@ namespace SEAN.Scenario.Agents
         {
             public string fixture = "Warehouse baked NavMesh and physical geometry; four animated SFAgents";
             public string model = "ColliderV1", contactModel = "VelocityBodyV1";
-            public int schema = 1, layoutVersion = 3;
+            public int schema = 2, layoutVersion = 3;
+            public string laserNoReturn;
             public float step, deadline = 45, desiredSpeed = Parameters.DESIRED_SPEED;
             public int[] seeds;
             public string[] layouts, modes;
@@ -113,6 +114,7 @@ namespace SEAN.Scenario.Agents
                 || report.modes.Length == 0 || report.modes.Distinct().Count() != report.modes.Length
                 || report.modes.Any(x => !new[] { "absent", "parked", "yielding", "oblivious", "nav2" }.Contains(x)))
                 throw new ArgumentException("Invalid encounter matrix");
+            report.laserNoReturn = FindObjectOfType<global::SEAN.Sensors.RaycastLaserScanner>().noReturn.ToString();
             Time.captureDeltaTime = Time.fixedDeltaTime = report.step;
             Application.targetFrameRate = Mathf.RoundToInt(1/report.step);
             QualitySettings.vSyncCount = 0;

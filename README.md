@@ -150,3 +150,8 @@ populated-simulator release qualification.
 The encounter JSON and its case index are authoritative for this diagnostic.
 The normal random task is disabled; its legacy TrialInfo task timer/goal are
 not reset for each fixture case and must not be used as encounter metrics.
+
+The raycast laser preserves empty-space observations as positive infinity;
+too-close physical hits remain invalid zero. Kuri Nav2 requires separate
+finite-hit marking and infinity-aware clearing observations (see the matching
+ROS profile). `-laser-no-return LegacyZero` is an explicit diagnostic control.
