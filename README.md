@@ -23,11 +23,28 @@ person/person forces and wall-force parameters retain their previous values.
 An exactly centred passing-side tie keeps the legacy tangent bias. This is an
 engineered response model, not a calibration against human observations.
 
+`IVI.SFAgent.contactModel` independently selects `VelocityBodyV1` (default)
+or `Legacy` contacts before Start. The new contact model applies the existing
+zero-friction velocity-body material to the animated body's owned physical
+colliders. The original floor friction fought root motion and made the same
+no-robot control take 12.44 s at 0.02 s steps versus 16.52 s at 0.04 s; the
+contact-material ablation took 9.96 s at both. This changes realized walking
+pace without changing the desired-speed parameter. It models an ideal driven
+capsule, not foot traction or calibrated human dynamics. A real animated-wall
+regression checks collision blocking.
+
+For the untouched baseline select both `robotResponse=Legacy` and
+`contactModel=Legacy`. To isolate force-model effects, compare Legacy and
+ColliderV1 with the same VelocityBodyV1 contacts. Future pedestrian controllers
+must share the same contact/motion model in a controlled comparison.
+
 The opt-in `-pedestrian-validation-output /absolute/path/report.json` diagnostic
 uses production Kuri and animated pedestrians on a separate open floor in the
 Warehouse player. It controls frame/physics steps explicitly and records raw
 trajectories, independent horizontal body clearance and physical contacts.
 `-pedestrian-validation-model Legacy` retains the old response for comparison;
+`-pedestrian-validation-contact Legacy` selects original contacts;
+`-pedestrian-validation-modes absent` requests control-only cases.
 `-pedestrian-validation-seeds 7,42` and `-pedestrian-validation-step 0.02` select
 the fixture parameters. Without the output flag the diagnostic is not installed
 and does not change simulation stepping. See the coordination repository's
