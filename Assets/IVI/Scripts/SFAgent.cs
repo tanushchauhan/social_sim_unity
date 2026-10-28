@@ -150,7 +150,7 @@ namespace IVI
             if (robotResponse == SEAN.Scenario.Agents.RobotResponse.ColliderV1 && robotBody != null)
             {
                 robotForce = SEAN.Scenario.Agents.RobotAvoidance.Force(transform.position,velocity,
-                    nearestGoalPoint-transform.position,robotBody,robotColliders,MASS,out bool inFront,out bool approaching);
+                    nearestGoalPoint-transform.position,robotBody,robotColliders,out bool inFront,out bool approaching);
                 // Robot braking and sidestepping must survive the legacy backward/lateral limits.
                 totalForce.force += robotForce;
                 totalForce.anyAgentInFront |= inFront;

@@ -9,7 +9,7 @@ namespace SEAN.Scenario.Agents
     // ColliderV1 changes only robot response; person/person and wall forces retain their limits.
     public static class RobotAvoidance
     {
-        public const float RepulsionOffset = .25f;
+        public const float RepulsionOffset = 0f;
         public const float AnticipationGap = 3f;
         public const float SidestepForce = Parameters.A/(10*Parameters.LATERAL_DAMPENING);
         public static Collider[] BodyColliders(Rigidbody body)
@@ -25,7 +25,7 @@ namespace SEAN.Scenario.Agents
         }
 
         public static Vector3 Force(Vector3 position, Vector3 velocity, Vector3 goalDirection,
-            Rigidbody body, Collider[] colliders, float mass, out bool inFront, out bool approaching)
+            Rigidbody body, Collider[] colliders, out bool inFront, out bool approaching)
         {
             position.y = 0;
             goalDirection.y = 0; goalDirection.Normalize();

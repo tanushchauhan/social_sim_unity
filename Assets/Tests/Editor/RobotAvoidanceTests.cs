@@ -25,7 +25,7 @@ public class RobotAvoidanceTests
     private Vector3 Force(Vector3 p, Vector3 v, Vector3 goal)
     {
         Physics.SyncTransforms();
-        object[] args = { p, v, goal, body, new Collider[] { shape }, 80f, false, false };
+        object[] args = { p, v, goal, body, new Collider[] { shape }, false, false };
         return (Vector3)Helper.GetMethod("Force").Invoke(null,args);
     }
 
