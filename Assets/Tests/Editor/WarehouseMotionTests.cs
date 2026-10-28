@@ -29,7 +29,7 @@ public class WarehouseMotionTests
                 // Same velocity/angular-velocity actuation used by VelocityController.
                 body.velocity = new Vector3(.3f,1,0);
                 body.angularVelocity = new Vector3(1,1,1);
-                yield return new WaitForFixedUpdate();
+                yield return null;
             }
             Assert.That(Mathf.Abs(Mathf.DeltaAngle(0,body.rotation.eulerAngles.y)),Is.GreaterThan(15),
                 "Fixture suppressed the commanded Nav2 yaw");
