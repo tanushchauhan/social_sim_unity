@@ -26,12 +26,41 @@ public class JointAvatarTests
     }
     sealed class RecordingWorker : ISceneController
     {
-        readonly GoalTestController goal = new GoalTestController(.4);
+        readonly ISceneController goal;
+        readonly System.Diagnostics.Process process;
+        bool disposed;
+        [Serializable] sealed class Startup { public int port; }
+        public RecordingWorker(bool socket)
+        {
+            if (!socket) { goal = new GoalTestController(.4); return; }
+            var start = new System.Diagnostics.ProcessStartInfo("python3", "-u \"" +
+                Environment.GetEnvironmentVariable("SEAN_WORKER_SCRIPT") +
+                "\" --test-double --moving-test-double --port 0 --observation-steps 3 --dt .4") {
+                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true
+            };
+            process = System.Diagnostics.Process.Start(start);
+            try
+            {
+                var line = process.StandardOutput.ReadLineAsync();
+                if (!line.Wait(5000) || line.Result == null) throw new Exception("Animated worker startup failed");
+                goal = new SocketSceneController(JsonUtility.FromJson<Startup>(line.Result).port, 3, .4);
+            }
+            catch { if (!process.HasExited) process.Kill(); process.Dispose(); throw; }
+        }
         public readonly List<SceneSnapshot> Snapshots = new List<SceneSnapshot>();
         public bool Broken;
         public int Resets;
-        public void Reset(string id) { Resets++; Snapshots.Clear(); }
-        public void Dispose() { goal.Dispose(); }
+        public void Reset(string id) { Resets++; Snapshots.Clear(); goal.Reset(id); }
+        public void Dispose()
+        {
+            if (disposed) return;
+            disposed = true; goal.Dispose();
+            if (process != null)
+            {
+                if (!process.WaitForExit(3000)) { process.Kill(); process.WaitForExit(); }
+                process.Dispose();
+            }
+        }
         public SceneDecision Decide(SceneSnapshot snapshot)
         {
             if (Broken) throw new InvalidOperationException("test worker lost");
@@ -42,11 +71,23 @@ public class JointAvatarTests
     [UnityTest]
     public IEnumerator AnimatedAvatarsUseJointPhysicsTargetsAndStopOnResetAndWorkerLoss()
     {
+        yield return ExerciseAvatars(false);
+    }
+    [UnityTest]
+    public IEnumerator AnimatedAvatarsUsePythonWorkerHistoryAndPhysicalTargets()
+    {
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SEAN_WORKER_SCRIPT")))
+            Assert.Ignore("Set SEAN_WORKER_SCRIPT for animated cross-process validation");
+        yield return ExerciseAvatars(true);
+    }
+    IEnumerator ExerciseAvatars(bool socket)
+    {
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
         yield return new EnterPlayMode();
         float oldCapture = Time.captureDeltaTime, oldFixed = Time.fixedDeltaTime;
         int oldRate = Application.targetFrameRate;
         var objects = new List<GameObject>();
+        RecordingWorker worker = null;
         NavMeshDataInstance mesh = default;
         try
         {
@@ -67,7 +108,7 @@ public class JointAvatarTests
             var robotBody = robot.AddComponent<Rigidbody>(); robotBody.isKinematic = true;
             var driverObject = new GameObject("joint owner"); objects.Add(driverObject);
             var driver = (MonoBehaviour)driverObject.AddComponent(FindType("SEAN.Scenario.Agents.JointControllerDriver"));
-            var worker = new RecordingWorker();
+            worker = new RecordingWorker(socket);
             Invoke(driver, "Initialize", worker, robotBody, .5f, .4);
             var template = Resources.Load<GameObject>("Prefabs/RocketboxRandomAnimatedAgent")
                 .GetComponent(FindType("SEAN.Scenario.Agents.RandomAvatar"));
@@ -124,6 +165,11 @@ public class JointAvatarTests
             }
             yield return null;
             Assert.AreNotEqual(oldEpisode, worker.Snapshots.Last().EpisodeId);
+            if (socket)
+            {
+                until = Time.time + 1.2f;
+                while (Time.time < until) yield return null;
+            }
             // Inject worker loss at a synchronous boundary. The normal driver
             // remains stopped until explicit reset; the robot is untouched.
             worker.Broken = true;
@@ -145,6 +191,7 @@ public class JointAvatarTests
         finally
         {
             foreach (var go in objects.AsEnumerable().Reverse()) if (go != null) UnityEngine.Object.Destroy(go);
+            if (worker != null) worker.Dispose();
             if (mesh.valid) mesh.Remove();
             Time.captureDeltaTime = oldCapture; Time.fixedDeltaTime = oldFixed;
             Application.targetFrameRate = oldRate;
