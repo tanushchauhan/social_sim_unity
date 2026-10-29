@@ -71,14 +71,18 @@ public class JointAvatarTests
     [UnityTest]
     public IEnumerator AnimatedAvatarsUseJointPhysicsTargetsAndStopOnResetAndWorkerLoss()
     {
-        yield return ExerciseAvatars(false);
+        var exercise = ExerciseAvatars(false);
+        try { while (exercise.MoveNext()) yield return exercise.Current; }
+        finally { (exercise as IDisposable)?.Dispose(); }
     }
     [UnityTest]
     public IEnumerator AnimatedAvatarsUsePythonWorkerHistoryAndPhysicalTargets()
     {
         if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SEAN_WORKER_SCRIPT")))
             Assert.Ignore("Set SEAN_WORKER_SCRIPT for animated cross-process validation");
-        yield return ExerciseAvatars(true);
+        var exercise = ExerciseAvatars(true);
+        try { while (exercise.MoveNext()) yield return exercise.Current; }
+        finally { (exercise as IDisposable)?.Dispose(); }
     }
     IEnumerator ExerciseAvatars(bool socket)
     {
