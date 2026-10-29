@@ -290,6 +290,30 @@ public class MigrationTests
     }
 
     [Test]
+    public void ViewSwitcherCyclesAllViewsAndParsesArguments()
+    {
+        Type switcher = FindType("SEAN.Display.ViewSwitcher");
+        Type view = switcher.GetNestedType("View");
+        MethodInfo next = switcher.GetMethod("Next");
+        MethodInfo parse = switcher.GetMethod("Parse");
+        object current = Enum.Parse(view, "Auto");
+        var seen = new System.Collections.Generic.List<string>();
+        for (int i = 0; i < Enum.GetValues(view).Length; i++)
+        {
+            seen.Add(current.ToString());
+            current = next.Invoke(null, new[] { current });
+        }
+        Assert.That(current.ToString(), Is.EqualTo("Auto"));
+        Assert.That(seen, Is.EqualTo(new[] { "Auto", "FirstPerson", "ThirdPerson", "Overhead", "Top" }));
+        Assert.That(parse.Invoke(null, new object[] { "third-person" }).ToString(), Is.EqualTo("ThirdPerson"));
+        Assert.That(parse.Invoke(null, new object[] { "top" }).ToString(), Is.EqualTo("Top"));
+        var error = Assert.Throws<TargetInvocationException>(() => parse.Invoke(null, new object[] { "sideways" }));
+        Assert.That(error.InnerException, Is.InstanceOf<ArgumentException>());
+        var display = Resources.Load<GameObject>("SEAN/Display");
+        Assert.That(display.GetComponent(switcher), Is.Not.Null, "The SEAN display prefab must carry the view switcher");
+    }
+
+    [Test]
     public void PublisherRegistersAgainAfterConnectionReplacement()
     {
         Type connectionType = FindType("Unity.Robotics.ROSTCPConnector.ROSConnection");
