@@ -29,6 +29,7 @@ namespace SEAN.Scenario.Agents
         private float animationScale = 1.0f;
         private float idleSpeed = 0.5f;
         private bool applyRootMotion = true;
+        protected virtual bool SceneControlled { get { return false; } }
 
         #region Unity Functions
 
@@ -67,9 +68,10 @@ namespace SEAN.Scenario.Agents
 
         void Update()
         {
+            if (SceneControlled) return;
             velocity = UpdateVelocity();
             //print(name + " velocity: " + velocity);
-            Move();
+            Move(Time.deltaTime);
 
             //if (path.Count > 1 && Util.Geometry.GroundPlaneDist(transform.position, path[0]) < Parameters.MIN_DIST)
             //{
@@ -174,21 +176,39 @@ namespace SEAN.Scenario.Agents
                 return destPos;
             }
         }
-        private void Move()
+        protected void AnimateSceneVelocity(Vector3 target, float step)
+        {
+            if (!SceneControlled) throw new System.InvalidOperationException("Avatar is not scene controlled");
+            velocity = target;
+            Move(step, true);
+        }
+
+        protected void ClearSceneMotion()
+        {
+            velocity = Vector3.zero;
+            if (animator != null)
+            {
+                StopAnimator();
+                animator.speed = 0;
+            }
+            if (rb != null) rb.velocity = rb.angularVelocity = Vector3.zero;
+        }
+
+        private void Move(float step, bool followVelocity = false)
         {
             float angle = 0;
             // compute angular velocity from next goal position
             if (!(GetType().Equals(typeof(Scenario.Agents.Playback.Agent)) || GetType().Equals(typeof(PlayerAgent))))
             {
                 // $$$ FIX: can't move to 0,0,0
-                if (destPos == Vector3.zero)
+                if (!followVelocity && destPos == Vector3.zero)
                 {
                     //print(name + " destPos is zero");
                     return;
                 }
-                Vector3 goalDir = nearestGoalPoint - transform.position;
+                Vector3 goalDir = followVelocity ? velocity : nearestGoalPoint - transform.position;
                 float goalWeight = 0.5f;
-                goalDir = goalWeight * goalDir.normalized + (1 - goalWeight) * velocity.normalized;
+                if (!followVelocity) goalDir = goalWeight * goalDir.normalized + (1 - goalWeight) * velocity.normalized;
                 goalDir.y = 0;
                 angle = -Vector3.SignedAngle(goalDir, transform.forward, Vector3.up);
             }
@@ -196,7 +216,7 @@ namespace SEAN.Scenario.Agents
             {
                 if (GetType().Equals(typeof(PlayerAgent)))
                 {
-                    angle = velocity.y * ANGULAR_SPEED * Time.deltaTime;
+                    angle = velocity.y * ANGULAR_SPEED * step;
                 }
                 // read the angular velocity from the velocity field
                 // note: this line is nearly identical to the following lines
@@ -208,9 +228,9 @@ namespace SEAN.Scenario.Agents
                 }
             }
             //Angular Velocity and rotation
-            if (Mathf.Abs(angle) > ANGULAR_SPEED * Time.deltaTime)
+            if (Mathf.Abs(angle) > ANGULAR_SPEED * step)
             {
-                angle = Mathf.Sign(angle) * ANGULAR_SPEED * Time.deltaTime;
+                angle = Mathf.Sign(angle) * ANGULAR_SPEED * step;
             }
             //angle = Mathf.Sign(angle) * Mathf.Min(ANGULAR_SPEED, Mathf.Abs(angle)) * Time.deltaTime;
             transform.RotateAround(transform.position, Vector3.up, angle);

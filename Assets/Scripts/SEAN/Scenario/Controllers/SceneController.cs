@@ -14,17 +14,22 @@ namespace SEAN.Scenario.Controllers
         public readonly Vector2 Position, Velocity;
         public readonly float Heading, Radius, MaxSpeed;
         public readonly Vector2? Destination;
+        public readonly Vector2? PreferredVelocity;
         public ActorState(string id, bool isRobot, bool active, Vector2 position,
-            Vector2 velocity, float heading, float radius, float maxSpeed, Vector2? destination)
+            Vector2 velocity, float heading, float radius, float maxSpeed, Vector2? destination,
+            Vector2? preferredVelocity = null)
         {
             if (string.IsNullOrWhiteSpace(id) || !Contract.Finite(position) ||
                 !Contract.Finite(velocity) || !Contract.Finite(heading) ||
                 !Contract.Finite(radius) || radius <= 0 || !Contract.Finite(maxSpeed) || maxSpeed < 0 ||
-                (destination.HasValue && !Contract.Finite(destination.Value)))
+                (destination.HasValue && !Contract.Finite(destination.Value)) ||
+                (preferredVelocity.HasValue && (!Contract.Finite(preferredVelocity.Value) ||
+                    preferredVelocity.Value.magnitude > maxSpeed + 1e-6f)))
                 throw new ArgumentException("Invalid actor state");
             Id = id; IsRobot = isRobot; Active = active; Position = position;
             Velocity = velocity; Heading = heading; Radius = radius; MaxSpeed = maxSpeed;
             Destination = destination;
+            PreferredVelocity = preferredVelocity;
         }
     }
 

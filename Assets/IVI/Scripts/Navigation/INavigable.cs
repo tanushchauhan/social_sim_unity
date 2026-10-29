@@ -14,6 +14,7 @@ namespace IVI
         private NavNode destNode;
         protected Vector3 destPos;
         private bool navigating = false;
+        public bool IsNavigating { get { return navigating; } }
 
 
         protected override void Start()

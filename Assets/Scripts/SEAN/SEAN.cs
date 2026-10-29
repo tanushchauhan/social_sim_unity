@@ -73,6 +73,12 @@ namespace SEAN
                 {
                     UnityEngine.Random.InitState(Int32.Parse(value));
                 }
+                else if (args[i] == "-pedestrian-controller")
+                {
+                    if (value == "social_forces") AgentController = Scenario.Agents.LowLevelControl.SF;
+                    else if (value == "joint_test") AgentController = Scenario.Agents.LowLevelControl.JointTest;
+                    else throw new ArgumentException("Supported pedestrian controllers: social_forces, joint_test");
+                }
                 else if (args[i] == "-scenario")
                 {
                     SetPedestrianBehavior(value);
