@@ -27,6 +27,8 @@ namespace SEAN.Metrics
                 throw new System.Exception("CountCollisions can only be attached to objects with exactly one existing CapsuleCollider");
             }
             CapsuleCollider rigidCollider = GetComponent<CapsuleCollider>();
+            var contacts = gameObject.AddComponent<ObjectContactSensor>();
+            contacts.Contact += () => sean.metrics.IncrementObjectCollisions();
             // Personal Space
             CapsuleCollider personalSpaceCollider = gameObject.AddComponent<CapsuleCollider>();
             personalSpaceCollider.isTrigger = true;
@@ -86,11 +88,7 @@ namespace SEAN.Metrics
 
             if (!(hit.gameObject.tag.Equals(SEAN.AgentTag) || hit.gameObject.tag.Equals(SEAN.GroupTag)))
             {
-                if (ShowDebug)
-                {
-                    print("At vel " + v + ", " + vel + " ObjectCollision with " + hit.gameObject.name + " is a trigger? " + hit.isTrigger);
-                }
-                sean.metrics.IncrementObjectCollisions();
+                // Personal-space triggers do not establish physical object contact.
                 return;
             }
 
@@ -122,6 +120,13 @@ namespace SEAN.Metrics
                     print("At vel " + v + ", " + vel + " Collision Space Violation of " + dist + " meters with " + hit.gameObject.name + " is a trigger? " + hit.isTrigger);
                 }
                 sean.metrics.IncrementPeopleCollisions(isRobotAtFault);
+                // Person contacts are rare; log each one so it can be found in recordings and trajectories.
+                var now = sean.clock.Now();
+                Vector3 robot = gameObject.transform.position;
+                Vector3 person = hit.transform.position;
+                Debug.Log(string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "SEAN person contact: stamp={0}.{1:D9} agent={2} robot_at_fault={3} distance_m={4:F3} robot_speed_mps={5:F3} robot_unity=({6:F2},{7:F2}) person_unity=({8:F2},{9:F2})",
+                    now.sec, now.nanosec, hit.gameObject.name, isRobotAtFault, dist, vel, robot.x, robot.z, person.x, person.z));
             }
         }
     }

@@ -27,13 +27,13 @@ namespace SEAN.Sensors
         private LaserScanner laserScanner;
         public string FrameId = "laser";
 
-        private RosMessageTypes.Sensor.MLaserScan message;
+        private RosMessageTypes.Sensor.LaserScanMsg message;
         private float scanPeriod;
         private float previousScanTime = 0;
 
         void Start()
         {
-            ros = ROSConnection.instance;
+            ros = ROSConnection.GetOrCreateInstance();
             laserScanner = GetComponent<LaserScanner>();
             message = laserScanner.InitializeMessage(FrameId);
             scanPeriod = laserScanner.ScanPeriod();
@@ -52,7 +52,7 @@ namespace SEAN.Sensors
         {
             SEAN.instance.clock.UpdateMHeader(message.header);
             message.ranges = laserScanner.Scan();
-            ros.Send(Topic, message);
+            ros.PublishAuto(Topic, message);
         }
     }
 

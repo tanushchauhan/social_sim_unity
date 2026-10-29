@@ -18,8 +18,8 @@ namespace SEAN.Control
         protected void Start()
         {
             sean = SEAN.instance;
-            ros = ROSConnection.instance;
-            ros.Subscribe<RosMessageTypes.Geometry.MTwist>(Topic, CmdVelMessage);
+            ros = ROSConnection.GetOrCreateInstance();
+            ros.Subscribe<RosMessageTypes.Geometry.TwistMsg>(Topic, CmdVelMessage);
         }
 
         void Update()
@@ -33,6 +33,6 @@ namespace SEAN.Control
             }
         }
 
-        protected abstract void CmdVelMessage(RosMessageTypes.Geometry.MTwist msg);
+        protected abstract void CmdVelMessage(RosMessageTypes.Geometry.TwistMsg msg);
     }
 }

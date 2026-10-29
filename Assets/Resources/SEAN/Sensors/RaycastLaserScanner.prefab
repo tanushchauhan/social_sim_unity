@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 2147979594329780847}
   - component: {fileID: 4911665009782362503}
   - component: {fileID: 2400723242208510165}
+  - component: {fileID: 6745328711245678901}
   m_Layer: 0
   m_Name: RaycastLaserScanner
   m_TagString: Untagged
@@ -69,3 +70,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Topic: /laser_raycast
   FrameId: laser
+--- !u!114 &6745328711245678901
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2147979594329780846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fd4d57d54a177420eac8d8a0e67ee569, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  FrameID: laser
+  AdjustXRot: 0
+  AdjustYRot: 0
+  AdjustZRot: 0

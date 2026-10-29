@@ -16,7 +16,7 @@ namespace SEAN.Display
         // Start is called before the first frame update
         void Awake()
         {
-            ROSConnection.instance.ShowHud = false;
+            ROSConnection.GetOrCreateInstance().ShowHud = false;
         }
 
     }

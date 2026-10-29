@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2021, Members of Yale Interactive Machines Group, Yale University,
+// Copyright (c) 2021, Members of Yale Interactive Machines Group, Yale University,
 // Nathan Tsoi
 // All rights reserved.
 // This source code is licensed under the BSD-style license found in the
@@ -16,19 +16,22 @@ namespace SEAN.Metrics
 
         public string TopicName = "/social_sim/metrics";
 
-        private RosMessageTypes.SocialSimRos.MTrialInfo trialInfoMessage;
+        public float PublishInterval = 1f;
+        private float lastPublishTime = float.NegativeInfinity;
+        private RosMessageTypes.SocialSimRos.TrialInfoMsg trialInfoMessage;
 
 
         void Start()
         {
-            trialInfoMessage = new RosMessageTypes.SocialSimRos.MTrialInfo();
-            ros = ROSConnection.instance;
+            trialInfoMessage = new RosMessageTypes.SocialSimRos.TrialInfoMsg();
+            ros = ROSConnection.GetOrCreateInstance();
             sean = SEAN.instance;
         }
 
         private void Update()
         {
-            if (!sean.robotTask.isRunning) { return; }
+            if (!sean.robotTask.isRunning || Time.time - lastPublishTime < PublishInterval) { return; }
+            lastPublishTime = Time.time;
             sean.clock.UpdateMHeader(trialInfoMessage.header);
 
             // Information about the current interaction
@@ -46,8 +49,8 @@ namespace SEAN.Metrics
             // Robot location / distance relative to start / goal
             trialInfoMessage.dist_to_target = sean.metrics.TargetDist;
             trialInfoMessage.min_dist_to_target = sean.metrics.MinDistToTarget;
-            trialInfoMessage.robot_poses = new RosMessageTypes.Geometry.MPose[sean.metrics.RobotPoses.Count];
-            trialInfoMessage.robot_poses_ts = new RosMessageTypes.Std.MTime[sean.metrics.RobotPoses.Count];
+            trialInfoMessage.robot_poses = new RosMessageTypes.Geometry.PoseMsg[sean.metrics.RobotPoses.Count];
+            trialInfoMessage.robot_poses_ts = new RosMessageTypes.BuiltinInterfaces.TimeMsg[sean.metrics.RobotPoses.Count];
             for (int i = 0; i < sean.metrics.RobotPoses.Count; i++)
             {
                 trialInfoMessage.robot_poses[i] = Util.Geometry.GetMPose(sean.metrics.RobotPoses[i]);
@@ -67,7 +70,7 @@ namespace SEAN.Metrics
             // Collisions w/ static objects
             trialInfoMessage.obj_collisions = sean.metrics.ObjectCollisions;
 
-            ros.Send(TopicName, trialInfoMessage);
+            ros.PublishAuto(TopicName, trialInfoMessage);
         }
 
 

@@ -49,7 +49,7 @@ public class LaserScanWriter : MonoBehaviour
         isReceived = false;
     }
 
-    public void Write(RosMessageTypes.Sensor.MLaserScan laserScan)
+    public void Write(RosMessageTypes.Sensor.LaserScanMsg laserScan)
     {
         ranges = new float[laserScan.ranges.Length];
         directions = new Vector3<FLU>[laserScan.ranges.Length];

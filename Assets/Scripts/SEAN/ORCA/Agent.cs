@@ -2,11 +2,9 @@
 
 namespace SEAN.ORCA
 {
-    class Agent : Scenario.Agents.Base
+    public class Agent : Scenario.Agents.JointAgent
     {
-        protected override Vector3 UpdateVelocity()
-        {
-            throw new System.NotImplementedException();
-        }
+        // Local avoidance is coordinated once per scene, never once per agent.
+        protected override bool UseOrca { get { return true; } }
     }
 }

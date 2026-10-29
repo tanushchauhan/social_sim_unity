@@ -54,6 +54,10 @@ namespace SEAN.Scenario.Agents
                 {
                     avatarObject.AddComponent<ORCA.Agent>();
                 }
+                else if (controller == LowLevelControl.JointTest)
+                {
+                    avatarObject.AddComponent<JointAgent>();
+                }
             }
             avatarObject.transform.parent = transform;
         }

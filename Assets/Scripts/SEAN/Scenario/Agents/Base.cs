@@ -28,12 +28,15 @@ namespace SEAN.Scenario.Agents
         public Vector3 velocity { get; protected set; }
         private float animationScale = 1.0f;
         private float idleSpeed = 0.5f;
-        private bool applyRootMotion = true;
+        public PedestrianActuation actuation = PedestrianActuation.AnimatedRootMotionV1;
+        protected virtual bool SceneControlled { get { return false; } }
 
         #region Unity Functions
 
         protected override void Start()
         {
+            if (SceneControlled) actuation = PedestrianActuation.VelocityTargetsV1;
+            else if (SEAN.instance != null) actuation = SEAN.instance.PedestrianMotion;
             nmPath = new NavMeshPath();
             // Having a disabled navmesh agent allows it to move
             nma = gameObject.AddComponent<NavMeshAgent>();
@@ -60,16 +63,18 @@ namespace SEAN.Scenario.Agents
             collisionCapsule.center = Vector3.up * agentHeight / 2f;
 
             animator = GetComponent<Animator>();
-            animator.applyRootMotion = applyRootMotion;
+            animator.applyRootMotion = actuation == PedestrianActuation.AnimatedRootMotionV1;
+            if (actuation == PedestrianActuation.VelocityTargetsV1) animator.updateMode = AnimatorUpdateMode.AnimatePhysics;
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             base.Start();
         }
 
         void Update()
         {
+            if (SceneControlled || actuation == PedestrianActuation.VelocityTargetsV1) return;
             velocity = UpdateVelocity();
             //print(name + " velocity: " + velocity);
-            Move();
+            Move(Time.deltaTime);
 
             //if (path.Count > 1 && Util.Geometry.GroundPlaneDist(transform.position, path[0]) < Parameters.MIN_DIST)
             //{
@@ -81,6 +86,21 @@ namespace SEAN.Scenario.Agents
 
             //    StopAnimator();
             //}
+        }
+
+        void FixedUpdate()
+        {
+            if (SceneControlled || actuation != PedestrianActuation.VelocityTargetsV1 || animator == null) return;
+            velocity = IsNavigating ? UpdateVelocity() : Vector3.zero;
+            Move(Time.fixedDeltaTime);
+            ApplyPhysicalVelocity(velocity);
+        }
+
+        protected void ApplyPhysicalVelocity(Vector3 target)
+        {
+            // Vertical motion remains physical. No positions are integrated or
+            // teleported here; contacts may change achieved planar velocity.
+            rb.velocity = new Vector3(target.x, rb.velocity.y, target.z);
         }
 
         #endregion
@@ -174,21 +194,40 @@ namespace SEAN.Scenario.Agents
                 return destPos;
             }
         }
-        private void Move()
+        protected void AnimateSceneVelocity(Vector3 target, float step)
+        {
+            if (!SceneControlled) throw new System.InvalidOperationException("Avatar is not scene controlled");
+            velocity = target;
+            Move(step, true);
+            ApplyPhysicalVelocity(target);
+        }
+
+        protected void ClearSceneMotion()
+        {
+            velocity = Vector3.zero;
+            if (animator != null)
+            {
+                StopAnimator();
+                animator.speed = 0;
+            }
+            if (rb != null) rb.velocity = rb.angularVelocity = Vector3.zero;
+        }
+
+        private void Move(float step, bool followVelocity = false)
         {
             float angle = 0;
             // compute angular velocity from next goal position
             if (!(GetType().Equals(typeof(Scenario.Agents.Playback.Agent)) || GetType().Equals(typeof(PlayerAgent))))
             {
                 // $$$ FIX: can't move to 0,0,0
-                if (destPos == Vector3.zero)
+                if (!followVelocity && actuation == PedestrianActuation.AnimatedRootMotionV1 && destPos == Vector3.zero)
                 {
                     //print(name + " destPos is zero");
                     return;
                 }
-                Vector3 goalDir = nearestGoalPoint - transform.position;
+                Vector3 goalDir = followVelocity ? velocity : nearestGoalPoint - transform.position;
                 float goalWeight = 0.5f;
-                goalDir = goalWeight * goalDir.normalized + (1 - goalWeight) * velocity.normalized;
+                if (!followVelocity) goalDir = goalWeight * goalDir.normalized + (1 - goalWeight) * velocity.normalized;
                 goalDir.y = 0;
                 angle = -Vector3.SignedAngle(goalDir, transform.forward, Vector3.up);
             }
@@ -196,7 +235,7 @@ namespace SEAN.Scenario.Agents
             {
                 if (GetType().Equals(typeof(PlayerAgent)))
                 {
-                    angle = velocity.y * ANGULAR_SPEED * Time.deltaTime;
+                    angle = velocity.y * ANGULAR_SPEED * step;
                 }
                 // read the angular velocity from the velocity field
                 // note: this line is nearly identical to the following lines
@@ -208,9 +247,9 @@ namespace SEAN.Scenario.Agents
                 }
             }
             //Angular Velocity and rotation
-            if (Mathf.Abs(angle) > ANGULAR_SPEED * Time.deltaTime)
+            if (Mathf.Abs(angle) > ANGULAR_SPEED * step)
             {
-                angle = Mathf.Sign(angle) * ANGULAR_SPEED * Time.deltaTime;
+                angle = Mathf.Sign(angle) * ANGULAR_SPEED * step;
             }
             //angle = Mathf.Sign(angle) * Mathf.Min(ANGULAR_SPEED, Mathf.Abs(angle)) * Time.deltaTime;
             transform.RotateAround(transform.position, Vector3.up, angle);
@@ -218,7 +257,7 @@ namespace SEAN.Scenario.Agents
             // Motion
             Vector3 animParams = Quaternion.Euler(0, -transform.eulerAngles.y, 0) * velocity;
             animParams *= animationScale;
-            var idle = animParams.magnitude < idleSpeed && !applyRootMotion;
+            var idle = animParams.magnitude < idleSpeed && actuation != PedestrianActuation.AnimatedRootMotionV1;
 
             animator.SetBool("Idling", idle);
             if (!GetType().Equals(typeof(PlayerAgent)))

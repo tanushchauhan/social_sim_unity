@@ -1,0 +1,20 @@
+{
+  "repository": "https://github.com/snape/RVO2-CS",
+  "revision": "5b7147d36d5cc6310c8e74c6955145c0fdc5fe06",
+  "release": "v2.0.1",
+  "license": "Apache-2.0",
+  "selection": "Official compatible tagged release; current main targets .NET 10. Unity/ROS versions retained.",
+  "original_source_sha256": {
+    "Agent.cs": "e11640a1df491406b04ae5418b73181060326bd9911d615f963e51e8fe894892",
+    "KdTree.cs": "b45fe13cc2db9b67c064499f74bf2b5202f6b8b28eb31746b4c0120212196d1e",
+    "Line.cs": "32b20cd756678688e9fcd126183508a273be1b09d7de1865b891463911d0eb63",
+    "Obstacle.cs": "2a573e5628bc6be6640da2dd1ae0f3359a879fe56ff0e6a80614ceb19aaba55a",
+    "RVOMath.cs": "ae404df2720ce2b6ff40108130aab0aff0b6028241a2dfc4c6b385a59c4477d5",
+    "Simulator.cs": "e9523f0e72d1d9e7c5ba1e5b7f45d95ee1f2cccadea0699e474ed078076e1033",
+    "Vector2.cs": "d6fca64501d9173a036f9498f79225fda0dfbd60ac95fbb77eca2eaa6a6f9013"
+  },
+  "local_changes": [
+    "Serial doStep removes worker allocation and executes one joint scene solve.",
+    "Explicit external-control flag assigns full pedestrian avoidance responsibility against robot/inactive context actors."
+  ]
+}

@@ -48,7 +48,7 @@ public class HeadPoseSubscriber : MonoBehaviour
         head.localEulerAngles = newAngles;
     }
 
-    void ReceiveMessage(RosMessageTypes.Gizmo.MHeadPose headPose)
+    void ReceiveMessage(RosMessageTypes.Gizmo.HeadPoseMsg headPose)
     {
         targetTiltAngle = headPose.tilt;
     }

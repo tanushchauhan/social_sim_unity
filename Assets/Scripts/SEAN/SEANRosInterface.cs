@@ -6,6 +6,7 @@
 // LICENSE file in the root directory of this source tree. 
 
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Unity.Robotics.ROSTCPConnector;
 
 namespace SEAN
@@ -15,17 +16,31 @@ namespace SEAN
         protected ROSConnection ros;
         protected SEAN sean;
         public string TopicTaskNew = "/social_sim/control/task/new";
+        public string TopicSceneReload = "/social_sim/control/scene/reload";
 
         protected void Start()
         {
             sean = SEAN.instance;
-            ros = ROSConnection.instance;
+            ros = ROSConnection.GetOrCreateInstance();
 
-            // Subscribers
-            ros.Subscribe<RosMessageTypes.Std.MBool>(TopicTaskNew, RecvTaskNew);
+            ros.Subscribe<RosMessageTypes.Std.BoolMsg>(TopicTaskNew, RecvTaskNew);
+            ros.Subscribe<RosMessageTypes.Std.BoolMsg>(TopicSceneReload, RecvSceneReload);
         }
 
-        void RecvTaskNew(RosMessageTypes.Std.MBool msg)
+        private void OnDestroy()
+        {
+            if (ros == null) { return; }
+            ros.Unsubscribe(TopicTaskNew);
+            ros.Unsubscribe(TopicSceneReload);
+        }
+
+        private void RecvSceneReload(RosMessageTypes.Std.BoolMsg msg)
+        {
+            if (msg.data && !sean.EvaluationMode)
+                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        }
+
+        void RecvTaskNew(RosMessageTypes.Std.BoolMsg msg)
         {
             if (sean.EvaluationMode) {
                 Debug.LogWarning("New Task disabled in evaluation mode");

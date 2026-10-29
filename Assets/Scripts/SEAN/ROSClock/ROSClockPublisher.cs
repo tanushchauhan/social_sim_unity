@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2021, Members of Yale Interactive Machines Group, Yale University,
+// Copyright (c) 2021, Members of Yale Interactive Machines Group, Yale University,
 // Nathan Tsoi
 // All rights reserved.
 // This source code is licensed under the BSD-style license found in the
@@ -21,10 +21,17 @@ namespace SEAN.ROSClock
 
         public static DateTime UNIX_EPOCH = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
         public double StartMillis { get; private set; }
+        private static double? epochMillis;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetEpoch()
+        {
+            epochMillis = null;
+        }
 
 
         public double LastMSecs { get; private set; }
-        private RosMessageTypes.Std.MTime lastPublishedTime;
+        private RosMessageTypes.BuiltinInterfaces.TimeMsg lastPublishedTime;
 
         private void Awake()
         {
@@ -34,17 +41,17 @@ namespace SEAN.ROSClock
             }
             else
             {
-                //print("TIMESCALE: " + Time.timeScale);
                 _instance = this;
-                StartMillis = (DateTime.Now.ToUniversalTime() - UNIX_EPOCH).TotalMilliseconds;
-                //print("startMillis: " + startMillis);
+                if (!epochMillis.HasValue)
+                    epochMillis = (DateTime.UtcNow - UNIX_EPOCH).TotalMilliseconds - Time.timeAsDouble * 1000;
+                StartMillis = epochMillis.Value;
                 lastPublishedTime = this.Now();
             }
         }
 
         void Start()
         {
-            ros = ROSConnection.instance;
+            ros = ROSConnection.GetOrCreateInstance();
         }
 
         void FixedUpdate()
@@ -52,12 +59,12 @@ namespace SEAN.ROSClock
             instance.Publish();
         }
 
-        public RosMessageTypes.Std.MTime Now()
+        public RosMessageTypes.BuiltinInterfaces.TimeMsg Now()
         {
             return Util.Time.MTime(Util.Time.Milliseconds(StartMillis));
         }
 
-        public RosMessageTypes.Std.MTime LastPublishedTime()
+        public RosMessageTypes.BuiltinInterfaces.TimeMsg LastPublishedTime()
         {
             return lastPublishedTime;
         }
@@ -70,27 +77,26 @@ namespace SEAN.ROSClock
                 return;
             }
             LastMSecs = msecs;
-            RosMessageTypes.Std.MTime t = instance.Now();
-            RosMessageTypes.Rosgraph.MClock message = new RosMessageTypes.Rosgraph.MClock();
-            message.clock.secs = t.secs;
-            message.clock.nsecs = t.nsecs;
-            //print("clock: " + t.secs + "." + t.nsecs);
-            ros.Send(topicName, message);
+            RosMessageTypes.BuiltinInterfaces.TimeMsg t = instance.Now();
+            RosMessageTypes.Rosgraph.ClockMsg message = new RosMessageTypes.Rosgraph.ClockMsg();
+            message.clock.sec = t.sec;
+            message.clock.nanosec = t.nanosec;
+            //print("clock: " + t.sec + "." + t.nanosec);
+            ros.PublishAuto(topicName, message);
             lastPublishedTime = t;
         }
 
-        public void UpdateMHeader(RosMessageTypes.Std.MHeader header)
+        public void UpdateMHeader(RosMessageTypes.Std.HeaderMsg header)
         {
-            UpdateMHeaders(new List<RosMessageTypes.Std.MHeader>() { header });
+            UpdateMHeaders(new List<RosMessageTypes.Std.HeaderMsg>() { header });
         }
 
-        public void UpdateMHeaders(List<RosMessageTypes.Std.MHeader> headers)
+        public void UpdateMHeaders(List<RosMessageTypes.Std.HeaderMsg> headers)
         {
-            foreach (RosMessageTypes.Std.MHeader header in headers)
+            foreach (RosMessageTypes.Std.HeaderMsg header in headers)
             {
-                header.seq++;
-                header.stamp.secs = lastPublishedTime.secs;
-                header.stamp.nsecs = lastPublishedTime.nsecs;
+                header.stamp.sec = lastPublishedTime.sec;
+                header.stamp.nanosec = lastPublishedTime.nanosec;
             }
         }
     }

@@ -2326,7 +2326,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 329623ccf2f364bcc8d307ae5fee54c3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  publishMessageFrequency: 0.5
+  publishMessageFrequency: 0.05
   topicName: /robot_odom
   PublishedTransform: {fileID: 8265910227519629423}
   FrameId: map
@@ -2711,6 +2711,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   FrameID: firstperson_rgb_link
+  AdjustXRot: 0
+  AdjustYRot: 90
+  AdjustZRot: 90
 --- !u!1001 &2231820642065157019
 PrefabInstance:
   m_ObjectHideFlags: 0

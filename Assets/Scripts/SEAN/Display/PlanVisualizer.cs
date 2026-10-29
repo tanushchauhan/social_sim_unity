@@ -24,7 +24,7 @@ namespace SEAN.Display
         private ulong stamp;
         private ulong prevStamp;
 
-        private RosMessageTypes.Nav.MPath message;
+        private RosMessageTypes.Nav.PathMsg message;
         private bool started = false;
 
         // settings for rendering path
@@ -41,7 +41,7 @@ namespace SEAN.Display
         void Awake()
         {
             // Make sure we catch the first global plan message
-            ROSConnection.instance.Subscribe<RosMessageTypes.Nav.MPath>(Topic, ReceiveMessage);
+            ROSConnection.GetOrCreateInstance().Subscribe<RosMessageTypes.Nav.PathMsg>(Topic, ReceiveMessage);
         }
 
         void Start()
@@ -62,7 +62,7 @@ namespace SEAN.Display
             ProcessMessage();
         }
 
-        void ReceiveMessage(RosMessageTypes.Nav.MPath message)
+        void ReceiveMessage(RosMessageTypes.Nav.PathMsg message)
         {
             this.message = message;
             ProcessMessage();
@@ -83,7 +83,7 @@ namespace SEAN.Display
             {
                 return;
             }
-            stamp = message.header.stamp.secs;
+            stamp = (ulong)message.header.stamp.sec;
             if (prevStamp == null || stamp - prevStamp < waitSec)
             {
                 return;

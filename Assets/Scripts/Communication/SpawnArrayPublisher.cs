@@ -13,13 +13,13 @@ public class SpawnArrayPublisher : MonoBehaviour
     public bool ContinuousPublish = false;
     private string frame = "map";
 
-    private RosMessageTypes.Geometry.MPoseArray message;
+    private RosMessageTypes.Geometry.PoseArrayMsg message;
     public List<Transform> possiblePositions = new List<Transform>();
 
     void Start()
     {
         InitializeMessage();
-        ros = ROSConnection.instance;
+        ros = ROSConnection.GetOrCreateInstance();
 
     }
 
@@ -33,7 +33,7 @@ public class SpawnArrayPublisher : MonoBehaviour
 
     private void InitializeMessage()
     {
-        message = new RosMessageTypes.Geometry.MPoseArray();
+        message = new RosMessageTypes.Geometry.PoseArrayMsg();
         message.header.frame_id = frame;
     }
 
@@ -46,15 +46,15 @@ public class SpawnArrayPublisher : MonoBehaviour
         }
 
         InitializeMessage();
-        message.header.stamp = new RosMessageTypes.Std.MTime();
-        message.poses = new RosMessageTypes.Geometry.MPose[possiblePositions.Count];
+        message.header.stamp = new RosMessageTypes.BuiltinInterfaces.TimeMsg();
+        message.poses = new RosMessageTypes.Geometry.PoseMsg[possiblePositions.Count];
 
         int i = 0;
         foreach (Transform pose in possiblePositions)
         {
-            RosMessageTypes.Geometry.MPose rosPose = new RosMessageTypes.Geometry.MPose();
+            RosMessageTypes.Geometry.PoseMsg rosPose = new RosMessageTypes.Geometry.PoseMsg();
 
-            RosMessageTypes.Geometry.MTransform ros_position = pose.transform.To<FLU>();
+            RosMessageTypes.Geometry.TransformMsg ros_position = pose.transform.To<FLU>();
 
             rosPose.position.x = ros_position.translation.x;
             rosPose.position.y = ros_position.translation.y;
@@ -69,6 +69,6 @@ public class SpawnArrayPublisher : MonoBehaviour
         }
         SEAN.SEAN.instance.clock.UpdateMHeader(message.header);
 
-        ros.Send(topicName, message);
+        ros.PublishAuto(topicName, message);
     }
 }

@@ -2010,7 +2010,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 329623ccf2f364bcc8d307ae5fee54c3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  publishMessageFrequency: 0.5
+  publishMessageFrequency: 0.05
   topicName: /robot_odom
   PublishedTransform: {fileID: 4199203777141923293}
   FrameId: map

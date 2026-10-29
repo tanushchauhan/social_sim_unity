@@ -25,6 +25,7 @@ namespace SEAN
         public const string GroupTag = "GroupMember";
 
         public Scenario.Agents.LowLevelControl AgentController;
+        public Scenario.Agents.PedestrianActuation PedestrianMotion = Scenario.Agents.PedestrianActuation.AnimatedRootMotionV1;
         public Scenario.Agents.ControlledAgent ControlledAgent;
 
         public bool TopDownViewOnly = false;
@@ -50,16 +51,43 @@ namespace SEAN
         private void ParseCommandLineArgs()
         {
             string[] args = System.Environment.GetCommandLineArgs();
-            for (int i = 0; i < args.Length - 1; i++)
+            bool externalGoals = false;
+            bool explicitActuation = false;
+            for (int i = 0; i < args.Length; i++)
             {
+                if (args[i] == "-external-goals")
+                {
+                    externalGoals = true;
+                    continue;
+                }
+                if (args[i] == "-evaluation-mode")
+                {
+                    EvaluationMode = true;
+                    continue;
+                }
+                if (i + 1 >= args.Length) { continue; }
                 string value = args[i + 1];
                 if (args[i] == "-ros-tcp-port")
                 {
                     RosConnectionPort = Int32.Parse(value);
                 }
-                else if (args[i] == "-evaluation-mode")
+                else if (args[i] == "-seed")
                 {
-                    EvaluationMode = true;
+                    UnityEngine.Random.InitState(Int32.Parse(value));
+                }
+                else if (args[i] == "-pedestrian-controller")
+                {
+                    if (value == "social_forces") AgentController = Scenario.Agents.LowLevelControl.SF;
+                    else if (value == "orca") AgentController = Scenario.Agents.LowLevelControl.ORCA;
+                    else if (value == "joint_test") AgentController = Scenario.Agents.LowLevelControl.JointTest;
+                    else throw new ArgumentException("Supported pedestrian controllers: social_forces, orca, joint_test");
+                }
+                else if (args[i] == "-pedestrian-actuation")
+                {
+                    explicitActuation = true;
+                    if (value == "root_motion") PedestrianMotion = Scenario.Agents.PedestrianActuation.AnimatedRootMotionV1;
+                    else if (value == "velocity_body") PedestrianMotion = Scenario.Agents.PedestrianActuation.VelocityTargetsV1;
+                    else throw new ArgumentException("Supported pedestrian actuators: root_motion, velocity_body");
                 }
                 else if (args[i] == "-scenario")
                 {
@@ -95,7 +123,15 @@ namespace SEAN
                     robotTask.timeoutTaskSeconds = float.Parse(value);
                 }
             }
-
+            if (externalGoals) { robotTask.PublishGoal = false; }
+            if (AgentController != Scenario.Agents.LowLevelControl.SF)
+            {
+                if (explicitActuation && PedestrianMotion != Scenario.Agents.PedestrianActuation.VelocityTargetsV1)
+                    throw new ArgumentException("Joint pedestrian controllers require velocity_body actuation");
+                PedestrianMotion = Scenario.Agents.PedestrianActuation.VelocityTargetsV1;
+            }
+            Debug.Log("SEAN pedestrian controller: " + AgentController);
+            Debug.Log("SEAN pedestrian actuation: " + PedestrianMotion);
         }
         #endregion arguments
 
@@ -171,7 +207,7 @@ namespace SEAN
             ParseCommandLineArgs();
 
 #if !UNITY_EDITOR
-            ROSConnection.instance.RosPort = RosConnectionPort;
+            ROSConnection.GetOrCreateInstance().RosPort = RosConnectionPort;
 #endif
         }
 

@@ -53,7 +53,7 @@ namespace SEAN.Input
 
         void Start()
         {
-            ros = ROSConnection.instance;
+            ros = ROSConnection.GetOrCreateInstance();
         }
 
         void Update()
@@ -130,12 +130,12 @@ namespace SEAN.Input
             Send();
         }
 
-        public RosMessageTypes.Geometry.MTwist CmdVel
+        public RosMessageTypes.Geometry.TwistMsg CmdVel
         {
             get
             {
                 // cmd vel
-                RosMessageTypes.Geometry.MTwist twist = new RosMessageTypes.Geometry.MTwist();
+                RosMessageTypes.Geometry.TwistMsg twist = new RosMessageTypes.Geometry.TwistMsg();
                 twist.linear.x = Vertical;
                 twist.angular.z = Horizontal;
                 return twist;
@@ -145,11 +145,11 @@ namespace SEAN.Input
         private void Send()
         {
             // trigger
-            RosMessageTypes.Std.MBool b = new RosMessageTypes.Std.MBool();
+            RosMessageTypes.Std.BoolMsg b = new RosMessageTypes.Std.BoolMsg();
             b.data = L1;
-            ros.Send(TopicTrigger, b);
+            ros.PublishAuto(TopicTrigger, b);
             // cmd vel
-            ros.Send(TopicCmdVel, CmdVel);
+            ros.PublishAuto(TopicCmdVel, CmdVel);
         }
     }
 }

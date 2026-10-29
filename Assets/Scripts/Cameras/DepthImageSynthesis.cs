@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.Rendering;
 using System.Collections;
 
@@ -39,11 +39,12 @@ public class DepthImageSynthesis : BaseCameraPublisher
     {
         base.Start();
 
-        int antiAliasing = antialiasing ? Mathf.Max(1, QualitySettings.antiAliasing) : 1;
-        renderTexture = new RenderTexture(width, height, depth);
-        renderTexture.antiAliasing = antiAliasing;
-        renderToTexturePixels = new Texture2D(height, width, TextureFormat.RGBA32, false);
-        texturePixels = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        // Packed depth channels are data: gamma conversion and MSAA corrupt them.
+        renderTexture = new RenderTexture(width, height, depth, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+        renderTexture.antiAliasing = 1;
+        renderToTexturePixels = new Texture2D(width, height, TextureFormat.RGBA32, false, true);
+        texturePixels = new Texture2D(width, height, TextureFormat.RGBA32, false, true);
+        camera.aspect = (float)width / height;
         camera.targetTexture = renderTexture;
         StartCoroutine("OffscreenRendering");
     }
@@ -58,27 +59,30 @@ public class DepthImageSynthesis : BaseCameraPublisher
             RenderTexture prevActiveRT = RenderTexture.active;
             RenderTexture.active = renderTexture;
             camera.Render();
+            RenderTexture.active = prevActiveRT;
 
             if (SystemInfo.supportsAsyncGPUReadback && EnableOffscreenRendering)
             {
-                AsyncGPUReadbackRequest request = AsyncGPUReadback.Request(renderTexture, 0);
+                AsyncGPUReadbackRequest request = AsyncGPUReadback.Request(renderTexture, 0, TextureFormat.RGBA32);
                 while (!request.done)
                 {
                     yield return new WaitForEndOfFrame();
                 }
                 if (request.hasError)
                 {
+                    RenderTexture.active = prevActiveRT;
                     Debug.Log("GPU readback error detected.");
                     yield return new WaitForSeconds(1.0f / FPS);
                     continue;
                 }
-                renderToTexturePixels.LoadRawTextureData(request.GetData<uint>());
+                renderToTexturePixels.LoadRawTextureData(request.GetData<byte>());
                 renderToTexturePixels.Apply();
                 texturePixels.SetPixels(renderToTexturePixels.GetPixels());
             }
             else
             {
                 // read offscreen texture contents into the CPU readable texture
+                RenderTexture.active = renderTexture;
                 texturePixels.ReadPixels(new Rect(0, 0, texturePixels.width, texturePixels.height), 0, 0);
                 texturePixels.Apply();
             }
@@ -86,7 +90,7 @@ public class DepthImageSynthesis : BaseCameraPublisher
             RenderTexture.active = prevActiveRT;
 
             byte[] pngBytes = texturePixels.EncodeToPNG();
-            RosMessageTypes.Sensor.MCompressedImage imageMessage = new RosMessageTypes.Sensor.MCompressedImage(new RosMessageTypes.Std.MHeader(), "png", pngBytes);
+            RosMessageTypes.Sensor.CompressedImageMsg imageMessage = new RosMessageTypes.Sensor.CompressedImageMsg(new RosMessageTypes.Std.HeaderMsg(), "png", pngBytes);
             PublishWithCameraInfo(imageMessage);
 
             yield return new WaitForSeconds(1.0f / FPS);

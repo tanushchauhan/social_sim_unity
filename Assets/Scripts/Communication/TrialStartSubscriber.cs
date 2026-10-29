@@ -29,7 +29,7 @@ public class TrialStartSubscriber : MonoBehaviour
     void Start()
     {
         throw new NotImplementedException("To implement");
-        ROSConnection.instance.Subscribe<RosMessageTypes.SocialSimRos.MTrialStart>("/social_sim/start_trial", ReceiveMessage);
+        ROSConnection.GetOrCreateInstance().Subscribe<RosMessageTypes.SocialSimRos.TrialStartMsg>("/social_sim/start_trial", ReceiveMessage);
     }
 
     private void Update()
@@ -41,9 +41,9 @@ public class TrialStartSubscriber : MonoBehaviour
         }
     }
 
-    void ReceiveMessage(RosMessageTypes.SocialSimRos.MTrialStart message)
+    void ReceiveMessage(RosMessageTypes.SocialSimRos.TrialStartMsg message)
     {
-        stamp = message.header.stamp.secs;
+        stamp = (ulong)message.header.stamp.sec;
         robotPosition = ((Vector3<FLU>)GetPosition(message.spawn)).toUnity;
         robotRotation = ((Quaternion<FLU>)GetRotation(message.spawn)).toUnity;
         targetPosition = ((Vector3<FLU>)GetPosition(message.target)).toUnity;
@@ -54,7 +54,7 @@ public class TrialStartSubscriber : MonoBehaviour
         }
         peoplePositions.Clear();
         peopleRotations.Clear();
-        foreach (RosMessageTypes.Geometry.MPose pose in message.people.poses)
+        foreach (RosMessageTypes.Geometry.PoseMsg pose in message.people.poses)
         {
             peoplePositions.Add(((Vector3<FLU>)GetPosition(pose)).toUnity);
             peopleRotations.Add(((Quaternion<FLU>)GetRotation(pose)).toUnity);
@@ -72,7 +72,7 @@ public class TrialStartSubscriber : MonoBehaviour
         //                                                timeLimit);
     }
 
-    private Vector3 GetPosition(RosMessageTypes.Geometry.MPose message)
+    private Vector3 GetPosition(RosMessageTypes.Geometry.PoseMsg message)
     {
         return new Vector3(
             (float)message.position.x,
@@ -80,7 +80,7 @@ public class TrialStartSubscriber : MonoBehaviour
             (float)message.position.z);
     }
 
-    private Quaternion GetRotation(RosMessageTypes.Geometry.MPose message)
+    private Quaternion GetRotation(RosMessageTypes.Geometry.PoseMsg message)
     {
         return new Quaternion(
             (float)message.orientation.x,

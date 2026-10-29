@@ -1,5 +1,4 @@
 using System.Collections;
-using UnityEditor;
 using UnityEngine;
 
 public class RGBCameraPublisher : BaseCameraPublisher
@@ -19,7 +18,7 @@ public class RGBCameraPublisher : BaseCameraPublisher
         base.Start();
         //print("SystemInfo.supportsAsyncGPUReadback: " + SystemInfo.supportsAsyncGPUReadback);
         renderTexture = new RenderTexture(width, height, 24);
-        texturePixels = new Texture2D(width, height, TextureFormat.RGB24, false);
+        texturePixels = new Texture2D(width, height, TextureFormat.RGBA32, false);
         // Can't have 2 cameras on a single gameobject, so make a child
         GameObject offscreenCameraGO = new GameObject("OffscreenCamera");
         offscreenCameraGO.transform.parent = transform;
@@ -29,8 +28,11 @@ public class RGBCameraPublisher : BaseCameraPublisher
         offscreenCamera = SEAN.Util.Unity.CopyComponent(camera, offscreenCameraGO);
         offscreenCamera.rect = new Rect(0f, 0f, 1f, 1f);
         offscreenCamera.targetTexture = renderTexture;
+        offscreenCamera.aspect = (float)width / height;
         StartCoroutine("OffscreenRendering");
     }
+
+    protected override Camera CalibrationCamera => offscreenCamera;
 
     IEnumerator OffscreenRendering()
     {
@@ -42,20 +44,30 @@ public class RGBCameraPublisher : BaseCameraPublisher
             RenderTexture prevActiveRT = RenderTexture.active;
             RenderTexture.active = renderTexture;
             offscreenCamera.Render();
+            RenderTexture.active = prevActiveRT;
 
             byte[] byteArray;
             if (SystemInfo.supportsAsyncGPUReadback && EnableOffscreenRendering)
             {
-                UnityEngine.Rendering.AsyncGPUReadbackRequest request = UnityEngine.Rendering.AsyncGPUReadback.Request(texturePixels, 0);
+                UnityEngine.Rendering.AsyncGPUReadbackRequest request = UnityEngine.Rendering.AsyncGPUReadback.Request(renderTexture, 0, TextureFormat.RGBA32);
                 while (!request.done)
                 {
                     yield return new WaitForEndOfFrame();
                 }
-                byteArray = request.GetData<byte>().ToArray();
+                if (request.hasError)
+                {
+                    RenderTexture.active = prevActiveRT;
+                    yield return new WaitForSeconds(1.0f / FPS);
+                    continue;
+                }
+                texturePixels.LoadRawTextureData(request.GetData<byte>());
+                texturePixels.Apply();
+                byteArray = texturePixels.EncodeToPNG();
             }
             else
             {
                 // read offscreen texture contents into the CPU readable texture
+                RenderTexture.active = renderTexture;
                 texturePixels.ReadPixels(new Rect(0, 0, texturePixels.width, texturePixels.height), 0, 0);
                 texturePixels.Apply();
                 byteArray = texturePixels.EncodeToPNG();
@@ -64,7 +76,7 @@ public class RGBCameraPublisher : BaseCameraPublisher
             // restore
             RenderTexture.active = prevActiveRT;
 
-            RosMessageTypes.Sensor.MCompressedImage imageMessage = new RosMessageTypes.Sensor.MCompressedImage(new RosMessageTypes.Std.MHeader(), "png", byteArray);
+            RosMessageTypes.Sensor.CompressedImageMsg imageMessage = new RosMessageTypes.Sensor.CompressedImageMsg(new RosMessageTypes.Std.HeaderMsg(), "png", byteArray);
             PublishWithCameraInfo(imageMessage);
 
             yield return new WaitForSeconds(1.0f / FPS);

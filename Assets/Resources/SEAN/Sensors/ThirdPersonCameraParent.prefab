@@ -116,7 +116,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Topic: /robot_thirdperson_rgb
-  FrameId: thirdperson_link
+  FrameId: thirdperson_rgb_link
   FPS: 15
   EnableOffscreenRendering: 1
   width: 640

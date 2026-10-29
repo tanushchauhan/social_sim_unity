@@ -69,8 +69,8 @@ namespace SEAN.Mapping
 
         // Ros connection and Ros Messages
         ROSConnection ros;
-        RosMessageTypes.Sensor.MCompressedImage short_map_msg = new RosMessageTypes.Sensor.MCompressedImage();
-        RosMessageTypes.Sensor.MCompressedImage tall_map_msg = new RosMessageTypes.Sensor.MCompressedImage();
+        RosMessageTypes.Sensor.CompressedImageMsg short_map_msg = new RosMessageTypes.Sensor.CompressedImageMsg();
+        RosMessageTypes.Sensor.CompressedImageMsg tall_map_msg = new RosMessageTypes.Sensor.CompressedImageMsg();
 
         // Start is called before the first frame update
         void Start()
@@ -88,7 +88,7 @@ namespace SEAN.Mapping
             time_elap = Time.time;
 
             // Use ROSTCP connector
-            ros = ROSConnection.instance;
+            ros = ROSConnection.GetOrCreateInstance();
 
             // compute bottom left corner
             x_min = (int)(-bounds.transform.localScale.x / 2 + bounds.transform.localPosition.x);
@@ -140,8 +140,8 @@ namespace SEAN.Mapping
                 created = true;
                 RotateTextures();
                 UpdateMessages();
-                ros.Send("/short_map/compressed", short_map_msg);
-                ros.Send("/tall_map/compressed", tall_map_msg);
+                ros.PublishAuto("/short_map/compressed", short_map_msg);
+                ros.PublishAuto("/tall_map/compressed", tall_map_msg);
                 Debug.Log("Done!");
             }
 
@@ -239,13 +239,13 @@ namespace SEAN.Mapping
 
         void UpdateMessages()
         {
-            short_map_msg.header = new RosMessageTypes.Std.MHeader(); // blank header for now
+            short_map_msg.header = new RosMessageTypes.Std.HeaderMsg(); // blank header for now
             // short_map_msg.format = "png";
             // short_map_msg.data = short_map.EncodeToPNG();
             short_map_msg.format = "jpeg";
             short_map_msg.data = short_map.EncodeToJPG(qualityLevel);
 
-            tall_map_msg.header = new RosMessageTypes.Std.MHeader(); // blank header for now
+            tall_map_msg.header = new RosMessageTypes.Std.HeaderMsg(); // blank header for now
             tall_map_msg.format = "jpeg";
             tall_map_msg.data = tall_map.EncodeToJPG(qualityLevel);
         }

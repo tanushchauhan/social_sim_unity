@@ -18,6 +18,8 @@ using UnityEngine;
 
 namespace SEAN.Sensors
 {
+    public enum LaserNoReturn { LegacyZero, PositiveInfinity }
+
     public class RaycastLaserScanner : LaserScanner
     {
         private Ray[] rays;
@@ -25,6 +27,7 @@ namespace SEAN.Sensors
         private Vector3[] directions;
         private LaserScanVisualizer[] laserScanVisualizers;
 
+        public LaserNoReturn noReturn = LaserNoReturn.PositiveInfinity;
         public int samples = 360;
         public int update_rate = 1800;
         public float angle_min = 0;
@@ -39,6 +42,9 @@ namespace SEAN.Sensors
 
         public void Start()
         {
+            string[] args = System.Environment.GetCommandLineArgs();
+            int index = System.Array.IndexOf(args,"-laser-no-return");
+            if (index >= 0) noReturn = (LaserNoReturn)System.Enum.Parse(typeof(LaserNoReturn),args[index+1]);
             directions = new Vector3[samples];
             ranges = new float[samples];
             intensities = new float[samples];
@@ -46,12 +52,12 @@ namespace SEAN.Sensors
             raycastHits = new RaycastHit[samples];
         }
 
-        public override RosMessageTypes.Sensor.MLaserScan InitializeMessage(string FrameId)
+        public override RosMessageTypes.Sensor.LaserScanMsg InitializeMessage(string FrameId)
         {
 
-            return new RosMessageTypes.Sensor.MLaserScan
+            return new RosMessageTypes.Sensor.LaserScanMsg
             {
-                header = new RosMessageTypes.Std.MHeader { frame_id = FrameId },
+                header = new RosMessageTypes.Std.HeaderMsg { frame_id = FrameId },
                 angle_min = angle_min,
                 angle_max = angle_max,
                 angle_increment = angle_increment,
@@ -93,8 +99,16 @@ namespace SEAN.Sensors
 
                 raycastHits[i] = new RaycastHit();
                 if (Physics.Raycast(rays[i], out raycastHits[i], range_max))
+                {
+                    // An out-of-range physical hit is invalid, not a free ray.
                     if (raycastHits[i].distance >= range_min && raycastHits[i].distance <= range_max)
                         ranges[i] = raycastHits[i].distance;
+                }
+                else if (noReturn == LaserNoReturn.PositiveInfinity)
+                {
+                    // Preserve free-space information for a clearing-only Nav2 source.
+                    ranges[i] = float.PositiveInfinity;
+                }
             }
         }
     }

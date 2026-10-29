@@ -23,10 +23,10 @@ public class LaserScanSubscriber : MonoBehaviour
 
     void Start()
     {
-        ROSConnection.instance.Subscribe<RosMessageTypes.Sensor.MLaserScan>(topic, ReceiveMessage);
+        ROSConnection.GetOrCreateInstance().Subscribe<RosMessageTypes.Sensor.LaserScanMsg>(topic, ReceiveMessage);
     }
 
-    void ReceiveMessage(RosMessageTypes.Sensor.MLaserScan laserScan)
+    void ReceiveMessage(RosMessageTypes.Sensor.LaserScanMsg laserScan)
     {
         laserScanWriter.Write(laserScan);
     }

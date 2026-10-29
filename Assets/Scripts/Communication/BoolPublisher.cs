@@ -16,12 +16,12 @@ public class BoolPublisher : MonoBehaviour
     public string Topic;
     ROSConnection ros;
 
-    private RosMessageTypes.Std.MBool message;
+    private RosMessageTypes.Std.BoolMsg message;
     private bool isInfoUpdated;
 
     void Start()
     {
-        ros = ROSConnection.instance;
+        ros = ROSConnection.GetOrCreateInstance();
         //base.Start();
         InitializeMessage();
     }
@@ -29,12 +29,12 @@ public class BoolPublisher : MonoBehaviour
     private void Update()
     {
         if (isInfoUpdated)
-            ros.Send(Topic, message);
+            ros.PublishAuto(Topic, message);
     }
 
     private void InitializeMessage()
     {
-        message = new RosMessageTypes.Std.MBool();
+        message = new RosMessageTypes.Std.BoolMsg();
     }
 
     public void UpdateInfo(bool data)

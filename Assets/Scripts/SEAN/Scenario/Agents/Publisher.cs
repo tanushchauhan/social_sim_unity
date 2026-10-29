@@ -21,26 +21,26 @@ namespace SEAN.Scenario.Agents
 
         void Start()
         {
-            ros = ROSConnection.instance;
+            ros = ROSConnection.GetOrCreateInstance();
             sean = SEAN.instance;
         }
 
         private void Update()
         {
-            RosMessageTypes.SocialSimRos.MAgentArray message = new RosMessageTypes.SocialSimRos.MAgentArray();
+            RosMessageTypes.SocialSimRos.AgentArrayMsg message = new RosMessageTypes.SocialSimRos.AgentArrayMsg();
             message.header.frame_id = frame;
             message.header.stamp = sean.clock.LastPublishedTime();
-            message.agents = new RosMessageTypes.SocialSimRos.MAgent[sean.pedestrianBehavior.agents.Length];
+            message.agents = new RosMessageTypes.SocialSimRos.AgentMsg[sean.pedestrianBehavior.agents.Length];
             int i = 0;
             foreach (Trajectory.TrackedAgent person in sean.pedestrianBehavior.agents)
             {
-                RosMessageTypes.SocialSimRos.MAgent agent = new RosMessageTypes.SocialSimRos.MAgent();
+                RosMessageTypes.SocialSimRos.AgentMsg agent = new RosMessageTypes.SocialSimRos.AgentMsg();
                 agent.type = "person";
                 agent.pose = Util.Geometry.GetMPose(person.gameObject.transform);
                 agent.twist = Util.Geometry.GetMTwist(person.trajectory);
                 message.agents[i++] = agent;
             }
-            ros.Send(topicName, message);
+            ros.PublishAuto(topicName, message);
         }
     }
 }
