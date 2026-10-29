@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Globalization;
 using UnityEngine;
+using UnityEngine.AI;
 using SEAN.Scenario.Controllers;
 
 namespace SEAN.Scenario.Agents
@@ -18,15 +20,29 @@ namespace SEAN.Scenario.Agents
         double decisionPeriod, nextDecision;
         bool populationDirty, faulted;
         global::SEAN.Tasks.Base task;
+        IReadOnlyList<Obstacle> obstacles = new Obstacle[0];
+        public string GeometryModel { get; private set; } = "open_floor_test";
+        public string ControllerName { get; private set; }
+        public OrcaSettings OrcaConfiguration { get; private set; }
+        public float RobotRadius { get { return robotRadius; } }
+        public int ObstacleCount { get { return obstacles.Count; } }
+        public string EpisodeId { get { return core == null ? null : core.EpisodeId; } }
+        public readonly List<double> InferenceMilliseconds = new List<double>();
         public SceneSnapshot LastSnapshot { get; private set; }
         public int DecisionCount { get; private set; }
         public bool Faulted { get { return faulted; } }
 
-        public static JointControllerDriver ForScene()
+        public static JointControllerDriver ForScene(bool useOrca)
         {
             var existing = FindObjectsOfType<JointControllerDriver>();
             if (existing.Length > 1) throw new InvalidOperationException("Multiple joint controller owners");
-            if (existing.Length == 1) return existing[0];
+            if (existing.Length == 1)
+            {
+                if ((useOrca && existing[0].ControllerName != "orca") ||
+                    (!useOrca && existing[0].ControllerName == "orca"))
+                    throw new InvalidOperationException("Cannot mix joint pedestrian controller owners");
+                return existing[0];
+            }
             var driver = new GameObject("Joint pedestrian controller").AddComponent<JointControllerDriver>();
             try
             {
@@ -40,7 +56,26 @@ namespace SEAN.Scenario.Agents
                     var b = c.bounds; var offset = b.center - body.position;
                     return new Vector2(offset.x, offset.z).magnitude + new Vector2(b.extents.x, b.extents.z).magnitude;
                 });
-                driver.Initialize(new GoalTestController(.4), body, radius, .4);
+                if (useOrca)
+                {
+                    var settings = new OrcaSettings();
+                    string[] args = System.Environment.GetCommandLineArgs();
+                    for (int i = 0; i + 1 < args.Length; i++)
+                    {
+                        if (args[i] == "-orca-decision-period") settings.decisionPeriod = double.Parse(args[i+1],CultureInfo.InvariantCulture);
+                        else if (args[i] == "-orca-neighbor-distance") settings.neighborDistance = float.Parse(args[i+1],CultureInfo.InvariantCulture);
+                        else if (args[i] == "-orca-max-neighbors") settings.maxNeighbors = int.Parse(args[i+1],CultureInfo.InvariantCulture);
+                        else if (args[i] == "-orca-agent-horizon") settings.agentHorizon = float.Parse(args[i+1],CultureInfo.InvariantCulture);
+                        else if (args[i] == "-orca-obstacle-horizon") settings.obstacleHorizon = float.Parse(args[i+1],CultureInfo.InvariantCulture);
+                    }
+                    settings.Validate();
+                    driver.obstacles = NavMeshControllerGeometry.Capture(body.position);
+                    driver.GeometryModel = "NavMeshBoundaryV1";
+                    driver.OrcaConfiguration = settings;
+                    driver.Initialize(new OrcaSceneController(settings), body, radius, settings.decisionPeriod);
+                    Debug.Log("ORCA controller initialized: " + JsonUtility.ToJson(settings) + " geometry=" + driver.GeometryModel + " polygons=" + driver.obstacles.Count);
+                }
+                else driver.Initialize(new GoalTestController(.4), body, radius, .4);
                 return driver;
             }
             catch { Destroy(driver.gameObject); throw; }
@@ -53,6 +88,7 @@ namespace SEAN.Scenario.Agents
                 Math.Abs(period / Time.fixedDeltaTime - Math.Round(period / Time.fixedDeltaTime)) > 1e-4)
                 throw new ArgumentException("One owner, robot footprint and whole-physics-step cadence required");
             robot = externalRobot; robotRadius = radius; decisionPeriod = period;
+            ControllerName = worker is OrcaSceneController ? "orca" : worker is GoalTestController ? "joint_test" : "custom_test";
             workerDecision = worker.Decide;
             core = new SceneController(worker, this, period);
             if (SEAN.instance != null)
@@ -67,7 +103,21 @@ namespace SEAN.Scenario.Agents
         {
             if (core == null || agent == null || !agent.Initialized ||
                 string.IsNullOrWhiteSpace(agent.StableId) || agent.StableId == "robot" || agents.ContainsKey(agent.StableId))
+            {
+                faulted = true;
+                if (core != null) core.Fail();
                 throw new InvalidOperationException("Invalid or duplicate joint actor registration");
+            }
+            if (GeometryModel == "NavMeshBoundaryV1")
+            {
+                var path = new NavMeshPath();
+                if (!NavMesh.CalculatePath(agent.transform.position, robot.position, NavMesh.AllAreas, path) ||
+                    path.status != NavMeshPathStatus.PathComplete)
+                {
+                    faulted = true; core.Fail();
+                    throw new InvalidOperationException("ORCA actor is outside the robot's connected floor; entire scene stopped");
+                }
+            }
             agents.Add(agent.StableId, agent); PopulationChanged();
         }
         public void Unregister(JointAgent agent)
@@ -87,6 +137,7 @@ namespace SEAN.Scenario.Agents
             if (core == null) return;
             core.Reset(Guid.NewGuid().ToString("N"));
             LastSnapshot = null; nextDecision = double.NegativeInfinity;
+            InferenceMilliseconds.Clear(); DecisionCount = 0;
             populationDirty = faulted = false;
         }
 
@@ -104,10 +155,11 @@ namespace SEAN.Scenario.Agents
                     states.Add(new ActorState("robot", true, true, Contract.FromUnity(robot.position),
                         Contract.FromUnity(robot.velocity), Contract.HeadingFromUnity(robot.rotation.eulerAngles.y * Mathf.Deg2Rad),
                         robotRadius, float.MaxValue, null));
-                    // Geometry transport is not supplied by this open-floor
-                    // test double. A geometry-aware adapter must provide it.
-                    LastSnapshot = core.BeginStep(simulationTime, states, new Obstacle[0]);
-                    if (!core.Apply(workerDecision(LastSnapshot)))
+                    LastSnapshot = core.BeginStep(simulationTime, states, obstacles);
+                    var timer = System.Diagnostics.Stopwatch.StartNew();
+                    var decision = workerDecision(LastSnapshot);
+                    timer.Stop(); InferenceMilliseconds.Add(timer.Elapsed.TotalMilliseconds);
+                    if (!core.Apply(decision))
                         throw new InvalidOperationException("Invalid joint controller output");
                     nextDecision = simulationTime + decisionPeriod;
                     DecisionCount++;

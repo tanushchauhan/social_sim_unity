@@ -76,8 +76,9 @@ namespace SEAN
                 else if (args[i] == "-pedestrian-controller")
                 {
                     if (value == "social_forces") AgentController = Scenario.Agents.LowLevelControl.SF;
+                    else if (value == "orca") AgentController = Scenario.Agents.LowLevelControl.ORCA;
                     else if (value == "joint_test") AgentController = Scenario.Agents.LowLevelControl.JointTest;
-                    else throw new ArgumentException("Supported pedestrian controllers: social_forces, joint_test");
+                    else throw new ArgumentException("Supported pedestrian controllers: social_forces, orca, joint_test");
                 }
                 else if (args[i] == "-scenario")
                 {
@@ -114,6 +115,7 @@ namespace SEAN
                 }
             }
             if (externalGoals) { robotTask.PublishGoal = false; }
+            Debug.Log("SEAN pedestrian controller: " + AgentController);
         }
         #endregion arguments
 

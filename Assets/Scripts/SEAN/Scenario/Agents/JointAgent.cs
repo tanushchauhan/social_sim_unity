@@ -11,6 +11,7 @@ namespace SEAN.Scenario.Agents
         public Vector3 TargetVelocity { get; private set; }
         JointControllerDriver owner;
         protected override bool SceneControlled { get { return true; } }
+        protected virtual bool UseOrca { get { return false; } }
 
         protected override void Start()
         {
@@ -20,7 +21,7 @@ namespace SEAN.Scenario.Agents
             global::SEAN.Control.VelocityBodyMaterial.Apply(rb);
             Initialized = true;
             StopMotion();
-            owner = JointControllerDriver.ForScene();
+            owner = JointControllerDriver.ForScene(UseOrca);
             owner.Register(this);
             IVI.SFAgent.GO2Agent.Add(gameObject, this);
         }

@@ -1,3 +1,4 @@
 {
-    "name": "SEAN.Controllers"
+    "name": "SEAN.Controllers",
+    "references": ["SEAN.RVO2"]
 }

@@ -26,6 +26,9 @@ namespace SEAN.Scenario.Agents
             public Vector3[] people;
             public float[] robotClearances, personClearances, goalDistances;
             public bool yielding;
+            public Vector3[] personTargetVelocities, personActualVelocities;
+            public string controllerEpisodeId;
+            public long controllerSequence = -1;
         }
         [Serializable] public class Episode
         {
@@ -36,6 +39,8 @@ namespace SEAN.Scenario.Agents
             public Vector3[] robotPlan;
             public float duration;
             public int robotPersonContacts, personPersonContacts, personObjectContacts, robotObjectContacts;
+            public bool controllerFaulted;
+            public double[] inferenceMilliseconds;
             public List<Person> people = new List<Person>();
             public List<Sample> samples = new List<Sample>();
         }
@@ -43,6 +48,10 @@ namespace SEAN.Scenario.Agents
         {
             public string fixture = "Warehouse baked NavMesh and physical geometry; four animated SFAgents";
             public string model = "ColliderV1", contactModel = "VelocityBodyV1";
+            public string pedestrianController = "social_forces", geometryModel, orcaSourceRevision;
+            public Controllers.OrcaSettings orcaSettings;
+            public float controllerRobotRadius;
+            public int controllerObstacleCount;
             public int schema = 2, layoutVersion = 3;
             public string laserNoReturn;
             public float step, deadline = 45, desiredSpeed = Parameters.DESIRED_SPEED;
@@ -72,7 +81,8 @@ namespace SEAN.Scenario.Agents
         }
         private Rigidbody body;
         private Collider[] shapes;
-        private IVI.SFAgent[] agents = new IVI.SFAgent[0];
+        private Base[] agents = new Base[0];
+        private JointControllerDriver jointOwner;
         private Episode current;
         private string mode, output, exchange;
         private bool running, yielding;
@@ -106,7 +116,16 @@ namespace SEAN.Scenario.Agents
                 step = float.Parse(Argument("-warehouse-encounter-step", "0.02"), CultureInfo.InvariantCulture),
                 seeds = Argument("-warehouse-encounter-seeds", "7,42").Split(',').Select(int.Parse).ToArray(),
                 layouts = Argument("-warehouse-encounter-layouts", "aisle,rack_end").Split(','),
-                modes = Argument("-warehouse-encounter-modes", "absent,parked,yielding,oblivious,nav2").Split(',') };
+                modes = Argument("-warehouse-encounter-modes", "absent,parked,yielding,oblivious,nav2").Split(','),
+                pedestrianController = Argument("-pedestrian-controller", "social_forces") };
+            if (report.pedestrianController != "social_forces" && report.pedestrianController != "orca")
+                throw new ArgumentException("Encounter controller must be social_forces or orca");
+            if (report.pedestrianController == "orca")
+            {
+                report.model = "ORCA-RVO2-v2.0.1";
+                report.orcaSourceRevision = "5b7147d36d5cc6310c8e74c6955145c0fdc5fe06";
+                report.fixture = "Warehouse baked NavMesh and physical geometry; four animated ORCA agents";
+            }
             if (report.step != .02f && report.step != .04f) throw new ArgumentException("Unsupported step");
             if (report.seeds.Length == 0 || report.seeds.Distinct().Count() != report.seeds.Length
                 || report.layouts.Length == 0 || report.layouts.Distinct().Count() != report.layouts.Length
@@ -190,15 +209,20 @@ namespace SEAN.Scenario.Agents
                     }
                     SetRobot(current.robotStart,Quaternion.LookRotation((goal-start).normalized == Vector3.zero ? Vector3.forward : (goal-start).normalized));
                     UnityEngine.Random.InitState(seed);
-                    agents = new IVI.SFAgent[4];
+                    agents = new Base[4];
                     for (int i = 0; i < 4; i++)
                     {
                         var avatar = Instantiate(template.avatars[(int)((uint)seed+(uint)i)%template.avatars.Length], starts[i],Quaternion.LookRotation(goals[i]-starts[i]));
                         avatar.name = "Encounter person " + i;
                         avatar.GetComponent<Animator>().runtimeAnimatorController = template.animationController;
-                        agents[i] = avatar.AddComponent<IVI.SFAgent>();
-                        agents[i].robotResponse = RobotResponse.ColliderV1;
-                        agents[i].contactModel = IVI.PedestrianContactModel.VelocityBodyV1;
+                        if (report.pedestrianController == "orca") agents[i] = avatar.AddComponent<global::SEAN.ORCA.Agent>();
+                        else
+                        {
+                            var sf = avatar.AddComponent<IVI.SFAgent>();
+                            sf.robotResponse = RobotResponse.ColliderV1;
+                            sf.contactModel = IVI.PedestrianContactModel.VelocityBodyV1;
+                            agents[i] = sf;
+                        }
                     }
                     population.people = agents.Cast<Trajectory.TrackedAgent>().ToArray();
                 }
@@ -211,6 +235,16 @@ namespace SEAN.Scenario.Agents
                     continue;
                 }
                 yield return null;
+                if (report.pedestrianController == "orca")
+                {
+                    jointOwner = FindObjectOfType<JointControllerDriver>();
+                    if (jointOwner == null || jointOwner.ControllerName != "orca" || jointOwner.OrcaConfiguration == null)
+                        throw new InvalidOperationException("ORCA controller did not initialize");
+                    report.orcaSettings = jointOwner.OrcaConfiguration;
+                    report.geometryModel = jointOwner.GeometryModel;
+                    report.controllerRobotRadius = jointOwner.RobotRadius;
+                    report.controllerObstacleCount = jointOwner.ObstacleCount;
+                }
                 var probes = new WarehouseContactProbe[4];
                 for (int i = 0; i < 4; i++)
                 {
@@ -246,6 +280,7 @@ namespace SEAN.Scenario.Agents
                     agents[i].InitDest(goals[i]);
                 }
                 int robotPersonBaseline = robotProbe.person, robotObjectBaseline = robotProbe.objects;
+                if (jointOwner != null) jointOwner.ResetEpisode();
                 float started = Time.time;
                 current.samples.Add(Capture(0));
                 running = true;
@@ -270,6 +305,11 @@ namespace SEAN.Scenario.Agents
                 current.personPersonContacts = probes.Sum(p => p.person);
                 current.personObjectContacts = probes.Sum(p => p.objects);
                 current.complete = true;
+                if (jointOwner != null)
+                {
+                    current.controllerFaulted = jointOwner.Faulted;
+                    current.inferenceMilliseconds = jointOwner.InferenceMilliseconds.ToArray();
+                }
                 if (kind == "nav2") Save(Path.Combine(exchange,"ended-"+current.index),new Request { index = current.index });
                 Debug.Log("Warehouse encounter: " + kind + " " + layout + " mirror=" + mirror + " seed=" + seed
                     + " duration=" + current.duration + " peopleReached=" + current.people.Count(p => p.reachedSeconds >= 0)
@@ -323,7 +363,7 @@ namespace SEAN.Scenario.Agents
         {
             foreach (var agent in agents)
                 if (agent != null) { IVI.SFAgent.GO2Agent.Remove(agent.gameObject); Destroy(agent.gameObject); }
-            agents = new IVI.SFAgent[0]; population.people = new Trajectory.TrackedAgent[0];
+            agents = new Base[0]; population.people = new Trajectory.TrackedAgent[0];
         }
         private static float Horizontal(Vector3 a, Vector3 b) { a.y = b.y = 0; return Vector3.Distance(a,b); }
         private Sample Capture(float time)
@@ -334,7 +374,11 @@ namespace SEAN.Scenario.Agents
                 gaps.Add(Horizontal(positions[i],positions[j])-current.people[i].radius-current.people[j].radius);
             return new Sample { time = time, robotYaw = body.rotation.eulerAngles.y, robot = body.position, robotVelocity = body.velocity, people = positions,
                 robotClearances = positions.Select((p,i) => shapes.Min(c => RobotClearance(c,p))-current.people[i].radius).ToArray(),
-                personClearances = gaps.ToArray(), goalDistances = positions.Select((p,i) => Horizontal(p,current.people[i].goal)).ToArray(), yielding = yielding };
+                personClearances = gaps.ToArray(), goalDistances = positions.Select((p,i) => Horizontal(p,current.people[i].goal)).ToArray(), yielding = yielding,
+                personTargetVelocities = agents.Select(a => a.velocity).ToArray(),
+                personActualVelocities = agents.Select(a => a.GetComponent<Rigidbody>().velocity).ToArray(),
+                controllerEpisodeId = jointOwner == null ? null : jointOwner.EpisodeId,
+                controllerSequence = jointOwner == null || jointOwner.LastSnapshot == null ? -1 : jointOwner.LastSnapshot.Sequence };
         }
         private void FixedUpdate()
         {
@@ -379,7 +423,7 @@ namespace SEAN.Scenario.Agents
         public int person, robotContacts, objects;
         private void OnCollisionEnter(Collision collision)
         {
-            if (collision.collider.GetComponentInParent<IVI.SFAgent>() != null) { person++; return; }
+            if (collision.collider.GetComponentInParent<Base>() != null) { person++; return; }
             if (collision.rigidbody == robot) { robotContacts++; return; }
             for (int i = 0; i < collision.contactCount; i++)
                 if (collision.GetContact(i).normal.y < .5f) { objects++; return; }

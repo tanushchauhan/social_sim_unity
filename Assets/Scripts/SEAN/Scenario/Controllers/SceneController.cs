@@ -126,6 +126,7 @@ namespace SEAN.Scenario.Controllers
         SceneSnapshot pending;
         bool disposed, faulted;
         readonly HashSet<string> usedEpisodes = new HashSet<string>(StringComparer.Ordinal);
+        public string EpisodeId { get { return episode; } }
 
         public SceneController(ISceneController controller, ISceneMotionSink sink, double maxHorizon)
         {
