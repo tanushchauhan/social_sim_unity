@@ -48,7 +48,7 @@ trajectories, independent horizontal body clearance and physical contacts.
 `-pedestrian-validation-seeds 7,42` and `-pedestrian-validation-step 0.02` select
 the fixture parameters. Without the output flag the diagnostic is not installed
 and does not change simulation stepping. See the coordination repository's
-`PEDESTRIAN_AVOIDANCE.md` and dated result for acceptance and limitations.
+`docs/protocols/pedestrian-avoidance.md` and dated result for acceptance and limitations.
 
 ## Migration checks
 
@@ -141,7 +141,7 @@ uses normal laser/odometry streams and actions. Completed people remain at
 ordered terminal goals. Dense terminal queues are not qualified by this fixture.
 
 Use the coordination repository's `scripts/check_warehouse_encounters.sh` and
-`WAREHOUSE_ENCOUNTERS.md` for the external Nav2 handshake, full measurements,
+`docs/protocols/warehouse-encounters.md` for the external Nav2 handshake, full measurements,
 acceptance rules and outcomes. Its controlled stepping and planar robot
 constraints apply only when explicitly enabled. Normal scenarios retain their
 existing task/control behavior. A successful diagnostic subset is not a full
