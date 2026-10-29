@@ -105,7 +105,7 @@ public class SocketSceneControllerTests
                 if (fault == "timeout") { Thread.Sleep(500); return; }
                 if (fault == "disconnect") return;
                 Write(stream, "{\"version\":1,\"kind\":\"decision\",\"episode\":\"e\",\"sequence\":" +
-                    (fault == "stale" ? "9" : "0") + ",\"time\":0,\"valid_until\":0.4,\"ready\":true,\"targets\":[{\"id\":\"" +
+                    (fault == "stale" ? "9" : "0") + ",\"time\":0,\"time_token\":\"0\",\"valid_until\":0.4,\"valid_until_token\":\"0.4\",\"ready\":true,\"targets\":[{\"id\":\"" +
                     (fault == "robot" ? "robot" : "person") + "\",\"velocity\":[" + (fault == "overspeed" ? "5" : "0.2") + ",0]}]}");
             }
         });

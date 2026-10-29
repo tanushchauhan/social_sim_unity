@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -35,7 +36,7 @@ namespace SEAN.Scenario.Controllers
         [Serializable] sealed class Request
         {
             public int version = 1, observation_steps;
-            public string kind, episode;
+            public string kind, episode, time_token;
             public long sequence;
             public double time, dt;
             public ActorPacket[] actors;
@@ -45,7 +46,7 @@ namespace SEAN.Scenario.Controllers
         [Serializable] sealed class Response
         {
             public int version;
-            public string kind, episode;
+            public string kind, episode, time_token, valid_until_token;
             public long sequence;
             public double time, valid_until;
             public bool ready;
@@ -122,6 +123,7 @@ namespace SEAN.Scenario.Controllers
             if (snapshot.EpisodeId != episode) throw new InvalidOperationException("Reset the worker before stepping");
             var response = Exchange(new Request { kind = "step", episode = episode,
                 sequence = snapshot.Sequence, time = snapshot.SimulationTime,
+                time_token = snapshot.SimulationTime.ToString("R", CultureInfo.InvariantCulture),
                 actors = snapshot.Actors.Select(a => new ActorPacket {
                     id = a.Id, robot = a.IsRobot, active = a.Active, position = Pair(a.Position), velocity = Pair(a.Velocity),
                     heading = a.Heading, radius = a.Radius, max_speed = a.MaxSpeed,
@@ -131,13 +133,17 @@ namespace SEAN.Scenario.Controllers
                 }).ToArray(),
                 obstacles = snapshot.Obstacles.Select(o => new ObstaclePacket { id = o.Id,
                     vertices = o.Vertices.Select(v => new PointPacket { x = v.x, y = v.y }).ToArray() }).ToArray() });
+            double endpoint;
             if (response.kind != "decision" || response.sequence != snapshot.Sequence ||
-                response.time != snapshot.SimulationTime || !Contract.Finite(response.valid_until) ||
-                Math.Abs(response.valid_until - snapshot.SimulationTime - dt) > 1e-6 ||
+                response.time_token != snapshot.SimulationTime.ToString("R", CultureInfo.InvariantCulture) ||
+                !Contract.Finite(response.time) || Math.Abs(response.time - snapshot.SimulationTime) > 1e-6 ||
+                !double.TryParse(response.valid_until_token, NumberStyles.Float, CultureInfo.InvariantCulture, out endpoint) ||
+                !Contract.Finite(endpoint) || Math.Abs(endpoint - snapshot.SimulationTime - dt) > 1e-9 ||
+                !Contract.Finite(response.valid_until) || Math.Abs(response.valid_until - endpoint) > 1e-6 ||
                 response.targets == null || response.targets.Any(t => t == null || t.velocity == null || t.velocity.Length != 2))
             { faulted = true; throw new InvalidDataException("Malformed or stale worker response"); }
             HistoryReady = response.ready;
-            return new SceneDecision(response.episode, response.sequence, response.time, response.valid_until,
+            return new SceneDecision(response.episode, response.sequence, snapshot.SimulationTime, endpoint,
                 response.targets.Select(t => new MotionTarget(t.id, new Vector2(t.velocity[0], t.velocity[1]))));
         }
         static float[] Pair(Vector2 value) { return new[] { value.x, value.y }; }
