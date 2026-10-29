@@ -28,13 +28,15 @@ namespace SEAN.Scenario.Agents
         public Vector3 velocity { get; protected set; }
         private float animationScale = 1.0f;
         private float idleSpeed = 0.5f;
-        private bool applyRootMotion = true;
+        public PedestrianActuation actuation = PedestrianActuation.AnimatedRootMotionV1;
         protected virtual bool SceneControlled { get { return false; } }
 
         #region Unity Functions
 
         protected override void Start()
         {
+            if (SceneControlled) actuation = PedestrianActuation.VelocityTargetsV1;
+            else if (SEAN.instance != null) actuation = SEAN.instance.PedestrianMotion;
             nmPath = new NavMeshPath();
             // Having a disabled navmesh agent allows it to move
             nma = gameObject.AddComponent<NavMeshAgent>();
@@ -61,14 +63,15 @@ namespace SEAN.Scenario.Agents
             collisionCapsule.center = Vector3.up * agentHeight / 2f;
 
             animator = GetComponent<Animator>();
-            animator.applyRootMotion = applyRootMotion;
+            animator.applyRootMotion = actuation == PedestrianActuation.AnimatedRootMotionV1;
+            if (actuation == PedestrianActuation.VelocityTargetsV1) animator.updateMode = AnimatorUpdateMode.AnimatePhysics;
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             base.Start();
         }
 
         void Update()
         {
-            if (SceneControlled) return;
+            if (SceneControlled || actuation == PedestrianActuation.VelocityTargetsV1) return;
             velocity = UpdateVelocity();
             //print(name + " velocity: " + velocity);
             Move(Time.deltaTime);
@@ -83,6 +86,21 @@ namespace SEAN.Scenario.Agents
 
             //    StopAnimator();
             //}
+        }
+
+        void FixedUpdate()
+        {
+            if (SceneControlled || actuation != PedestrianActuation.VelocityTargetsV1 || animator == null) return;
+            velocity = IsNavigating ? UpdateVelocity() : Vector3.zero;
+            Move(Time.fixedDeltaTime);
+            ApplyPhysicalVelocity(velocity);
+        }
+
+        protected void ApplyPhysicalVelocity(Vector3 target)
+        {
+            // Vertical motion remains physical. No positions are integrated or
+            // teleported here; contacts may change achieved planar velocity.
+            rb.velocity = new Vector3(target.x, rb.velocity.y, target.z);
         }
 
         #endregion
@@ -181,6 +199,7 @@ namespace SEAN.Scenario.Agents
             if (!SceneControlled) throw new System.InvalidOperationException("Avatar is not scene controlled");
             velocity = target;
             Move(step, true);
+            ApplyPhysicalVelocity(target);
         }
 
         protected void ClearSceneMotion()
@@ -201,7 +220,7 @@ namespace SEAN.Scenario.Agents
             if (!(GetType().Equals(typeof(Scenario.Agents.Playback.Agent)) || GetType().Equals(typeof(PlayerAgent))))
             {
                 // $$$ FIX: can't move to 0,0,0
-                if (!followVelocity && destPos == Vector3.zero)
+                if (!followVelocity && actuation == PedestrianActuation.AnimatedRootMotionV1 && destPos == Vector3.zero)
                 {
                     //print(name + " destPos is zero");
                     return;
@@ -238,7 +257,7 @@ namespace SEAN.Scenario.Agents
             // Motion
             Vector3 animParams = Quaternion.Euler(0, -transform.eulerAngles.y, 0) * velocity;
             animParams *= animationScale;
-            var idle = animParams.magnitude < idleSpeed && !applyRootMotion;
+            var idle = animParams.magnitude < idleSpeed && actuation != PedestrianActuation.AnimatedRootMotionV1;
 
             animator.SetBool("Idling", idle);
             if (!GetType().Equals(typeof(PlayerAgent)))

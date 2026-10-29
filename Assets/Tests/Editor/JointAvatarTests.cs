@@ -87,17 +87,28 @@ public class JointAvatarTests
             for (int i = 0; i < 2; i++)
             {
                 Assert.That(avatars[i].GetComponent<Animator>().updateMode, Is.EqualTo(AnimatorUpdateMode.AnimatePhysics));
+                Assert.False(avatars[i].GetComponent<Animator>().applyRootMotion,
+                    "Animation must not add translation to the physical velocity target");
                 Invoke(agents[i], "InitDest", goals[i]);
             }
             float until = Time.time + 3;
-            while (Time.time < until) yield return null;
+            while (Time.time < until)
+            {
+                yield return null;
+                foreach (var avatar in avatars)
+                {
+                    var achieved = avatar.GetComponent<Rigidbody>().velocity;
+                    achieved.y = 0;
+                    Assert.LessOrEqual(achieved.magnitude,.61f,"Root animation added uncommanded translation");
+                }
+            }
             Assert.Greater(worker.Snapshots.Count, 3, "Joint scene decisions never ran");
             foreach (var snapshot in worker.Snapshots) Assert.AreEqual(3, snapshot.Actors.Count);
             for (int i = 0; i < 2; i++)
             {
                 Vector3 displacement = avatars[i].transform.position - starts[i]; displacement.y = 0;
                 Assert.Greater(Vector3.Dot(displacement, (goals[i]-starts[i]).normalized), .3f,
-                    "Actual production root motion did not follow the joint target");
+                    "Actual production body did not follow the joint target");
                 Assert.Less(displacement.magnitude, 2.5f, "Possible double integration");
                 var state = worker.Snapshots.Last().Actors.Single(a => a.Id == "person-" + i);
                 Assert.Greater((state.Position-Contract.FromUnity(starts[i])).magnitude, .2f,
@@ -117,8 +128,8 @@ public class JointAvatarTests
             // remains stopped until explicit reset; the robot is untouched.
             worker.Broken = true;
             var robotPosition = robotBody.position;
-            driver.enabled = false;
-            Invoke(driver, "ResetEpisode");
+            Assert.Greater(((Vector3)agents[0].GetType().GetProperty("TargetVelocity").GetValue(agents[0])).magnitude,.1f,
+                "Worker-loss check must begin while the avatar has a nonzero target");
             Assert.Throws<InvalidOperationException>(() => Invoke(driver, "StepBoundary", Time.fixedTimeAsDouble + .4, .02f));
             var stopped = avatars.Select(a => a.transform.position).ToArray();
             until = Time.time + .5f;

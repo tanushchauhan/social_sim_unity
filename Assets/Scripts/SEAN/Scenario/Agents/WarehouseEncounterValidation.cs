@@ -49,6 +49,7 @@ namespace SEAN.Scenario.Agents
             public string fixture = "Warehouse baked NavMesh and physical geometry; four animated SFAgents";
             public string model = "ColliderV1", contactModel = "VelocityBodyV1";
             public string pedestrianController = "social_forces", geometryModel, orcaSourceRevision;
+            public string actuationModel;
             public Controllers.OrcaSettings orcaSettings;
             public float controllerRobotRadius;
             public int controllerObstacleCount;
@@ -120,6 +121,7 @@ namespace SEAN.Scenario.Agents
                 pedestrianController = Argument("-pedestrian-controller", "social_forces") };
             if (report.pedestrianController != "social_forces" && report.pedestrianController != "orca")
                 throw new ArgumentException("Encounter controller must be social_forces or orca");
+            report.actuationModel = SEAN.instance.PedestrianMotion.ToString();
             if (report.pedestrianController == "orca")
             {
                 report.model = "ORCA-RVO2-v2.0.1";
