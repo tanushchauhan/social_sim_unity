@@ -71,6 +71,8 @@ public class JointAvatarTests
     [UnityTest]
     public IEnumerator AnimatedAvatarsUseJointPhysicsTargetsAndStopOnResetAndWorkerLoss()
     {
+        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        yield return new EnterPlayMode();
         var exercise = ExerciseAvatars(false);
         try { while (exercise.MoveNext()) yield return exercise.Current; }
         finally { (exercise as IDisposable)?.Dispose(); }
@@ -80,14 +82,14 @@ public class JointAvatarTests
     {
         if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SEAN_WORKER_SCRIPT")))
             Assert.Ignore("Set SEAN_WORKER_SCRIPT for animated cross-process validation");
+        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        yield return new EnterPlayMode();
         var exercise = ExerciseAvatars(true);
         try { while (exercise.MoveNext()) yield return exercise.Current; }
         finally { (exercise as IDisposable)?.Dispose(); }
     }
     IEnumerator ExerciseAvatars(bool socket)
     {
-        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-        yield return new EnterPlayMode();
         float oldCapture = Time.captureDeltaTime, oldFixed = Time.fixedDeltaTime;
         int oldRate = Application.targetFrameRate;
         var objects = new List<GameObject>();
