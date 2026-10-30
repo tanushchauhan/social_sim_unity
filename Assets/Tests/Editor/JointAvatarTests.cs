@@ -29,28 +29,36 @@ public class JointAvatarTests
         readonly ISceneController goal;
         readonly System.Diagnostics.Process process;
         bool disposed;
+        public bool Ready { get { return !(goal is SocketSceneController) || ((SocketSceneController)goal).HistoryReady; } }
+        public readonly List<bool> Readiness = new List<bool>();
+        public readonly List<SceneDecision> Decisions = new List<SceneDecision>();
         [Serializable] sealed class Startup { public int port; }
-        public RecordingWorker(bool socket)
+        public RecordingWorker(bool socket, bool forecast = false)
         {
             if (!socket) { goal = new GoalTestController(.4); return; }
-            var start = new System.Diagnostics.ProcessStartInfo("python3", "-u \"" +
+            string mode = forecast ? " --checkpoint \"" + Environment.GetEnvironmentVariable("SEAN_STARS_CHECKPOINT") +
+                "\" --extension \"" + Environment.GetEnvironmentVariable("SEAN_STARS_EXTENSION") +
+                "\" --allow-dirty-training-source --threads 1" : " --test-double --moving-test-double";
+            var start = new System.Diagnostics.ProcessStartInfo(Environment.GetEnvironmentVariable("SEAN_WORKER_PYTHON") ?? "python3", "-u \"" +
                 Environment.GetEnvironmentVariable("SEAN_WORKER_SCRIPT") +
-                "\" --test-double --moving-test-double --port 0 --observation-steps 3 --dt .4") {
+                "\"" + mode + " --port 0 --observation-steps " + (forecast ? "8" : "3") + " --dt .4") {
                 UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true
             };
             process = System.Diagnostics.Process.Start(start);
             try
             {
                 var line = process.StandardOutput.ReadLineAsync();
-                if (!line.Wait(5000) || line.Result == null) throw new Exception("Animated worker startup failed");
-                goal = new SocketSceneController(JsonUtility.FromJson<Startup>(line.Result).port, 3, .4);
+                if (!line.Wait(forecast ? 30000 : 5000) || line.Result == null) throw new Exception("Animated worker startup failed: " +
+                    (process.HasExited ? process.StandardError.ReadToEnd() : "startup deadline"));
+                goal = new SocketSceneController(JsonUtility.FromJson<Startup>(line.Result).port, forecast ? 8 : 3, .4);
             }
             catch { if (!process.HasExited) process.Kill(); process.Dispose(); throw; }
         }
         public readonly List<SceneSnapshot> Snapshots = new List<SceneSnapshot>();
         public bool Broken;
         public int Resets;
-        public void Reset(string id) { Resets++; Snapshots.Clear(); goal.Reset(id); }
+        public void Reset(string id) { Resets++; Snapshots.Clear(); Decisions.Clear(); Readiness.Clear(); goal.Reset(id); }
+        public void KillProcess() { process.Kill(); process.WaitForExit(); }
         public void Dispose()
         {
             if (disposed) return;
@@ -64,7 +72,8 @@ public class JointAvatarTests
         public SceneDecision Decide(SceneSnapshot snapshot)
         {
             if (Broken) throw new InvalidOperationException("test worker lost");
-            Snapshots.Add(snapshot); return goal.Decide(snapshot);
+            Snapshots.Add(snapshot);
+            var decision = goal.Decide(snapshot); Decisions.Add(decision); Readiness.Add(Ready); return decision;
         }
     }
 
@@ -88,7 +97,19 @@ public class JointAvatarTests
         try { while (exercise.MoveNext()) yield return exercise.Current; }
         finally { (exercise as IDisposable)?.Dispose(); }
     }
-    IEnumerator ExerciseAvatars(bool socket)
+    [UnityTest]
+    public IEnumerator AnimatedAvatarsUseStarsCheckpointAndStopOnProcessLoss()
+    {
+        foreach (string variable in new[] { "SEAN_WORKER_SCRIPT", "SEAN_WORKER_PYTHON", "SEAN_STARS_CHECKPOINT", "SEAN_STARS_EXTENSION" })
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(variable)))
+                Assert.Ignore("Set " + variable + " for real-checkpoint animated validation");
+        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        yield return new EnterPlayMode();
+        var exercise = ExerciseAvatars(true, true);
+        try { while (exercise.MoveNext()) yield return exercise.Current; }
+        finally { (exercise as IDisposable)?.Dispose(); }
+    }
+    IEnumerator ExerciseAvatars(bool socket, bool forecast = false)
     {
         float oldCapture = Time.captureDeltaTime, oldFixed = Time.fixedDeltaTime;
         int oldRate = Application.targetFrameRate;
@@ -114,7 +135,7 @@ public class JointAvatarTests
             var robotBody = robot.AddComponent<Rigidbody>(); robotBody.isKinematic = true;
             var driverObject = new GameObject("joint owner"); objects.Add(driverObject);
             var driver = (MonoBehaviour)driverObject.AddComponent(FindType("SEAN.Scenario.Agents.JointControllerDriver"));
-            worker = new RecordingWorker(socket);
+            worker = new RecordingWorker(socket, forecast);
             Invoke(driver, "Initialize", worker, robotBody, .5f, .4);
             var template = Resources.Load<GameObject>("Prefabs/RocketboxRandomAnimatedAgent")
                 .GetComponent(FindType("SEAN.Scenario.Agents.RandomAvatar"));
@@ -138,7 +159,7 @@ public class JointAvatarTests
                     "Animation must not add translation to the physical velocity target");
                 Invoke(agents[i], "InitDest", goals[i]);
             }
-            float until = Time.time + 3;
+            float until = Time.time + (forecast ? 7 : 3);
             while (Time.time < until)
             {
                 yield return null;
@@ -149,16 +170,32 @@ public class JointAvatarTests
                     Assert.LessOrEqual(achieved.magnitude,.61f,"Root animation added uncommanded translation");
                 }
             }
-            Assert.Greater(worker.Snapshots.Count, 3, "Joint scene decisions never ran");
+            Assert.Greater(worker.Snapshots.Count, forecast ? 8 : 3, "Joint scene decisions never ran");
             foreach (var snapshot in worker.Snapshots) Assert.AreEqual(3, snapshot.Actors.Count);
+            if (forecast)
+            {
+                Assert.That(worker.Readiness.Take(7), Is.All.False, "Warm-up released before eight actual observations");
+                Assert.That(worker.Readiness.Skip(7), Is.All.True);
+                foreach (var decision in worker.Decisions.Take(7))
+                    foreach (var target in decision.Targets) Assert.AreEqual(Vector2.zero, target.Velocity);
+                for (int i = 0; i < worker.Snapshots.Count; i++)
+                {
+                    Assert.AreEqual(i, worker.Snapshots[i].Sequence);
+                    foreach (var target in worker.Decisions[i].Targets) Assert.AreNotEqual("robot", target.ActorId);
+                }
+                Debug.Log("STARS_CHECKPOINT_AVATAR decisions=" + worker.Snapshots.Count +
+                    " first_ready_sequence=7 max_target_speed=" + worker.Decisions.SelectMany(d => d.Targets).Max(t => t.Velocity.magnitude) +
+                    " max_inference_ms=" + ((IEnumerable<double>)driver.GetType().GetField("InferenceMilliseconds").GetValue(driver)).Max());
+            }
             for (int i = 0; i < 2; i++)
             {
                 Vector3 displacement = avatars[i].transform.position - starts[i]; displacement.y = 0;
-                Assert.Greater(Vector3.Dot(displacement, (goals[i]-starts[i]).normalized), .3f,
+                if (forecast) Assert.Greater(displacement.magnitude, .0001f, "Forecast never moved the production body");
+                else Assert.Greater(Vector3.Dot(displacement, (goals[i]-starts[i]).normalized), .3f,
                     "Actual production body did not follow the joint target");
-                Assert.Less(displacement.magnitude, 2.5f, "Possible double integration");
+                Assert.Less(displacement.magnitude, forecast ? 5f : 2.5f, "Possible double integration");
                 var state = worker.Snapshots.Last().Actors.Single(a => a.Id == "person-" + i);
-                Assert.Greater((state.Position-Contract.FromUnity(starts[i])).magnitude, .2f,
+                Assert.Greater((state.Position-Contract.FromUnity(starts[i])).magnitude, forecast ? .0001f : .2f,
                     "Worker received predicted state instead of actual executed motion");
             }
             // Reset clears targets and physical velocity synchronously, before another frame.
@@ -171,18 +208,20 @@ public class JointAvatarTests
             }
             yield return null;
             Assert.AreNotEqual(oldEpisode, worker.Snapshots.Last().EpisodeId);
+            if (forecast) Assert.False(worker.Readiness.Last(), "Reset did not clear learned history");
             if (socket)
             {
-                until = Time.time + 1.2f;
+                until = Time.time + (forecast ? 4 : 1.2f);
                 while (Time.time < until) yield return null;
             }
             // Inject worker loss at a synchronous boundary. The normal driver
             // remains stopped until explicit reset; the robot is untouched.
-            worker.Broken = true;
+            if (forecast) worker.KillProcess(); else worker.Broken = true;
             var robotPosition = robotBody.position;
-            Assert.Greater(((Vector3)agents[0].GetType().GetProperty("TargetVelocity").GetValue(agents[0])).magnitude,.1f,
+            Assert.Greater(((Vector3)agents[0].GetType().GetProperty("TargetVelocity").GetValue(agents[0])).magnitude,forecast ? .000001f : .1f,
                 "Worker-loss check must begin while the avatar has a nonzero target");
-            Assert.Throws<InvalidOperationException>(() => Invoke(driver, "StepBoundary", Time.fixedTimeAsDouble + .4, .02f));
+            if (forecast) Assert.Catch<Exception>(() => Invoke(driver, "StepBoundary", Time.fixedTimeAsDouble + .4, .02f));
+            else Assert.Throws<InvalidOperationException>(() => Invoke(driver, "StepBoundary", Time.fixedTimeAsDouble + .4, .02f));
             var stopped = avatars.Select(a => a.transform.position).ToArray();
             until = Time.time + .5f;
             while (Time.time < until) yield return null;
