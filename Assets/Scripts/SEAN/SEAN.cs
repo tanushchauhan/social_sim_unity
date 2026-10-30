@@ -80,6 +80,8 @@ namespace SEAN
                     if (value == "social_forces") AgentController = Scenario.Agents.LowLevelControl.SF;
                     else if (value == "orca") AgentController = Scenario.Agents.LowLevelControl.ORCA;
                     else if (value == "joint_test") AgentController = Scenario.Agents.LowLevelControl.JointTest;
+                    else if (value == "stars" && args.Contains("-warehouse-encounter-output"))
+                        AgentController = Scenario.Agents.LowLevelControl.JointTest;
                     else throw new ArgumentException("Supported pedestrian controllers: social_forces, orca, joint_test");
                 }
                 else if (args[i] == "-pedestrian-actuation")

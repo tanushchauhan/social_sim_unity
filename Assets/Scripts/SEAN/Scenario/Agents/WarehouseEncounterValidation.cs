@@ -29,6 +29,7 @@ namespace SEAN.Scenario.Agents
             public Vector3[] personTargetVelocities, personActualVelocities;
             public string controllerEpisodeId;
             public long controllerSequence = -1;
+            public bool controllerHistoryReady;
         }
         [Serializable] public class Episode
         {
@@ -51,6 +52,9 @@ namespace SEAN.Scenario.Agents
             public string pedestrianController = "social_forces", geometryModel, orcaSourceRevision;
             public string actuationModel;
             public Controllers.OrcaSettings orcaSettings;
+            public string starsCheckpointSha256, starsExtensionRevision;
+            public int starsObservationSteps;
+            public double starsDecisionPeriod;
             public float controllerRobotRadius;
             public int controllerObstacleCount;
             public int schema = 2, layoutVersion = 3;
@@ -84,6 +88,7 @@ namespace SEAN.Scenario.Agents
         private Collider[] shapes;
         private Base[] agents = new Base[0];
         private JointControllerDriver jointOwner;
+        private Controllers.SocketSceneController starsWorker;
         private Episode current;
         private string mode, output, exchange;
         private bool running, yielding;
@@ -119,14 +124,25 @@ namespace SEAN.Scenario.Agents
                 layouts = Argument("-warehouse-encounter-layouts", "aisle,rack_end").Split(','),
                 modes = Argument("-warehouse-encounter-modes", "absent,parked,yielding,oblivious,nav2").Split(','),
                 pedestrianController = Argument("-pedestrian-controller", "social_forces") };
-            if (report.pedestrianController != "social_forces" && report.pedestrianController != "orca")
-                throw new ArgumentException("Encounter controller must be social_forces or orca");
+            if (report.pedestrianController != "social_forces" && report.pedestrianController != "orca" && report.pedestrianController != "stars")
+                throw new ArgumentException("Encounter controller must be social_forces, orca or experimental stars");
             report.actuationModel = SEAN.instance.PedestrianMotion.ToString();
             if (report.pedestrianController == "orca")
             {
                 report.model = "ORCA-RVO2-v2.0.1";
                 report.orcaSourceRevision = "5b7147d36d5cc6310c8e74c6955145c0fdc5fe06";
                 report.fixture = "Warehouse baked NavMesh and physical geometry; four animated ORCA agents";
+            }
+            if (report.pedestrianController == "stars")
+            {
+                report.model = "STARS-MA-deterministic";
+                report.fixture = "Warehouse baked NavMesh and physical geometry; four animated experimental STARS agents";
+                report.starsCheckpointSha256 = Argument("-stars-checkpoint-sha256", "");
+                report.starsExtensionRevision = Argument("-stars-extension-revision", "");
+                report.starsObservationSteps = 8; report.starsDecisionPeriod = .4;
+                if (report.starsCheckpointSha256.Length != 64 || report.starsExtensionRevision != "d72eb2295c3336f0674932796cf41b60636cde3e" ||
+                    SEAN.instance.PedestrianMotion != PedestrianActuation.VelocityTargetsV1)
+                    throw new ArgumentException("Explicit STARS worker provenance and velocity actuation required");
             }
             if (report.step != .02f && report.step != .04f) throw new ArgumentException("Unsupported step");
             if (report.seeds.Length == 0 || report.seeds.Distinct().Count() != report.seeds.Length
@@ -210,6 +226,15 @@ namespace SEAN.Scenario.Agents
                         current.people.Add(new Person { avatar = avatar.name, start = starts[i], goal = goals[i], plan = Plan(starts[i],goals[i]) });
                     }
                     SetRobot(current.robotStart,Quaternion.LookRotation((goal-start).normalized == Vector3.zero ? Vector3.forward : (goal-start).normalized));
+                    if (report.pedestrianController == "stars" && jointOwner == null)
+                    {
+                        if (FindObjectOfType<JointControllerDriver>() != null) throw new InvalidOperationException("Existing joint owner conflicts with STARS validation");
+                        starsWorker = new Controllers.SocketSceneController(int.Parse(Argument("-stars-worker-port", "0")), 8, .4);
+                        jointOwner = new GameObject("Experimental STARS encounter owner").AddComponent<JointControllerDriver>();
+                        float radius = shapes.Max(c => new Vector2((c.bounds.center-body.position).x,(c.bounds.center-body.position).z).magnitude +
+                            new Vector2(c.bounds.extents.x,c.bounds.extents.z).magnitude);
+                        jointOwner.Initialize(starsWorker, body, radius, .4);
+                    }
                     UnityEngine.Random.InitState(seed);
                     agents = new Base[4];
                     for (int i = 0; i < 4; i++)
@@ -218,6 +243,7 @@ namespace SEAN.Scenario.Agents
                         avatar.name = "Encounter person " + i;
                         avatar.GetComponent<Animator>().runtimeAnimatorController = template.animationController;
                         if (report.pedestrianController == "orca") agents[i] = avatar.AddComponent<global::SEAN.ORCA.Agent>();
+                        else if (report.pedestrianController == "stars") agents[i] = avatar.AddComponent<JointAgent>();
                         else
                         {
                             var sf = avatar.AddComponent<IVI.SFAgent>();
@@ -295,7 +321,7 @@ namespace SEAN.Scenario.Agents
                         if (current.people[i].reachedSeconds < 0 && sample.goalDistances[i] <= 1) current.people[i].reachedSeconds = elapsed;
                     bool robotDone = kind == "parked" || kind == "absent" || Horizontal(body.position,goal) <= .4f;
                     if (kind == "nav2") robotDone &= File.Exists(Path.Combine(exchange,"done-"+current.index));
-                    if (current.people.All(p => p.reachedSeconds >= 0) && robotDone) break;
+                    if ((jointOwner != null && jointOwner.Faulted) || (current.people.All(p => p.reachedSeconds >= 0) && robotDone)) break;
                 }
                 running = false;
                 foreach (var controller in controllers) controller.enabled = false;
@@ -318,6 +344,13 @@ namespace SEAN.Scenario.Agents
                     + " robotContacts=" + current.robotPersonContacts + " personContacts=" + current.personPersonContacts + " wallContacts=" + current.personObjectContacts);
                 CleanupPeople(); yield return null;
                 Save(output,report);
+                if (current.controllerFaulted)
+                {
+                    report.error = "Joint controller fault; remaining episodes not attempted";
+                    Save(output,report);
+                    Save(Path.Combine(exchange,"request.json"),new Request { complete = true });
+                    yield break;
+                }
             }
             report.complete = true; Save(output,report);
             Save(Path.Combine(exchange,"request.json"),new Request { complete = true });
@@ -380,7 +413,8 @@ namespace SEAN.Scenario.Agents
                 personTargetVelocities = agents.Select(a => a.velocity).ToArray(),
                 personActualVelocities = agents.Select(a => a.GetComponent<Rigidbody>().velocity).ToArray(),
                 controllerEpisodeId = jointOwner == null ? null : jointOwner.EpisodeId,
-                controllerSequence = jointOwner == null || jointOwner.LastSnapshot == null ? -1 : jointOwner.LastSnapshot.Sequence };
+                controllerSequence = jointOwner == null || jointOwner.LastSnapshot == null ? -1 : jointOwner.LastSnapshot.Sequence,
+                controllerHistoryReady = starsWorker != null && starsWorker.HistoryReady };
         }
         private void FixedUpdate()
         {
